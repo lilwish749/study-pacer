@@ -51,7 +51,21 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
 .admin-table td{padding:12px 14px;border-bottom:1px solid #262626;vertical-align:top}
 .admin-table td.ua{max-width:420px;color:var(--muted);font-size:11px;line-height:1.65}
 .admin-empty td{color:var(--muted);text-align:center;padding:34px 14px}
-@media(max-width:760px){.auth-card{padding:28px 22px}.auth-card h1{font-size:27px}.admin-table td.ua{max-width:220px}}
+.ai-panel{border:1px solid var(--line);background:var(--surface);padding:20px;margin:0 0 26px}
+.ai-head{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.ai-field{flex:1;min-width:220px}
+.ai-field label{display:block;font:600 10px/1.4 var(--font);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.ai-field input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:12px 14px;font:inherit;font-size:13px}
+.ai-field input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.ai-out{margin-top:18px;border-top:1px solid var(--line);padding-top:16px;max-height:58vh;overflow:auto}
+.ai-out[hidden]{display:none}
+.ai-day{font-size:15px;font-weight:600;margin:20px 0 8px;padding-left:10px;border-left:3px solid var(--accent)}
+.ai-line{font-size:13px;line-height:1.9;margin:0 0 2px;color:var(--text)}
+.ai-gap{height:8px}
+.ai-loading{font-size:13px;color:var(--muted);margin:0}
+.ai-error{font-size:12px;line-height:1.7;color:var(--warning);margin:14px 0 0}
+.ai-error[hidden]{display:none}
+@media(max-width:760px){.auth-card{padding:28px 22px}.auth-card h1{font-size:27px}.admin-table td.ua{max-width:220px}.ai-field{min-width:100%}.ai-head .btn{width:100%;justify-content:center}}
 </style>
 </head>
 <body>
@@ -1379,6 +1393,8 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
   const AUTH_DOMAIN = 'study-pacer.local';
   let authClient = null, currentUser = null, currentProfile = null, isAdmin = false;
   let authMode = 'login', authBusy = false, adminLogs = null;
+  // AI — Cerebras 生成的细化周方案只保存在当前会话，不写入本地存储。
+  let aiPlan = null, aiBusy = false;
   function navItems(){return isAdmin ? NAV.concat(ADMIN_NAV) : NAV;}
   const ICONS = {
     sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
@@ -2010,10 +2026,73 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
     main.innerHTML=pageHead('给这一周一点方向','10 月 26 日 – 11 月 1 日 · 示例周计划',button('export-calendar','导出日历',{icon:'download'})+button('add-entry','添加日程',{icon:'plus'})+button('generate','生成周计划',{primary:true,icon:'plus'}))+`
     <div class="week-summary"><span><strong class="accent">${amount(totalMinutes())}</strong> 已安排</span><span><strong>${state.sessions.filter(s=>s.done).length} / ${state.sessions.length}</strong> 次已完成</span><span><span class="status-dot"></span>预计周负荷 <strong>${Math.round(weekLoad())}%</strong> · ${loadTone()}</span></div>
     <div class="toolbar"><div class="segmented" aria-label="计划视图"><button data-week-view="week" aria-pressed="${weekView==='week'}">周视图</button><button data-week-view="list" aria-pressed="${weekView==='list'}">每日列表</button></div><span class="note">${weekView==='week'?'每格按时间顺序排列':'选一天，只看这一天的安排'}</span></div>
+    ${aiSectionMarkup()}
     ${weekView==='week'?`<section class="week-grid" aria-label="七天计划">${DAY_NAMES.map((d,i)=>`<div class="day-column ${dateAt(i)===TODAY?'today':''}"><div class="day-heading"><span>${d}</span><strong>${Number(dateAt(i).slice(8))}</strong></div><div class="day-items">${sessionList(dateAt(i)).map(weekBlock).join('')||`<p class="day-rest">${i===6?'给自己留白<br>今天休息':'还没有安排<br>可以慢慢来'}</p>`}</div></div>`).join('')}</section>`:`<div class="day-picker" aria-label="选择日期">${DAY_NAMES.map((d,i)=>`<button data-day="${dateAt(i)}" aria-pressed="${selectedDay===dateAt(i)}">${d}<span>${Number(dateAt(i).slice(8))}</span></button>`).join('')}</div><h2 class="agenda-heading">${dateLabel(selectedDay)} · ${DAY_NAMES[dayIndex(selectedDay)]}</h2>${sessionList(selectedDay).length?sessionList(selectedDay).map(taskRow).join(''):'<div class="empty"><h3>这一天还没有安排</h3><p>可以休息，也可以在生成计划时调整可用时间。</p></div>'}`}
     <p class="note" style="margin-top:22px">先调整「我的节奏」，再生成适合自己的安排。自动安排会留出休息间隔，并列出没有放下的练习。课程、上班等固定安排可以用「添加日程」直接放进来。</p>`;
   }
   function weekBlock(s){const a=interest(s.interestId),custom=isCustom(s);const detail=s.done?'✓ 已完成':(custom?`${duration(s)} 分钟 · ${e(kindLabel(s))}`:`${duration(s)} 分钟 · ${e(scoreLabel(a))}`);return `<article class="week-block ${s.done?'done':''} ${custom?'custom':''}"><span class="block-time">${s.start} – ${s.end}</span><h3>${e(sessionTitle(s))}</h3><p>${detail}</p><button class="text-btn" data-action="${custom?'edit-entry':'move-session'}" data-id="${e(s.id)}">${custom?'编辑安排':'调整时间'} ${icon('edit')}</button></article>`;}
+  // AI — 细化每周方案由 Cerebras 生成，密钥留在服务端，前端只调用 generate-plan。
+  function aiSectionMarkup(){
+    return `<section class="ai-panel" aria-label="细化每周方案">
+      <div class="ai-head"><div class="ai-field"><label for="aiHobby">想细化哪个兴趣</label><input id="aiHobby" maxlength="40" placeholder="例如：学吉他、练摄影、减脂训练" value="${e(aiPlan?aiPlan.hobby:'')}"></div>${button('ai-generate','生成细化方案',{primary:true,icon:'plus'})}</div>
+      <p class="note" style="margin:12px 0 0">由 Cerebras 模型生成周一到周日的具体安排，包含活动、时长、材料和完成标准。结果只作参考，可以按自己的情况调整。</p>
+      <p class="ai-error" id="aiError" role="alert" hidden></p>
+      <div class="ai-out" id="aiOut" ${aiPlan?'':'hidden'}>${aiPlan?planMarkup(aiPlan.text):''}</div>
+    </section>`;
+  }
+  function planMarkup(text){
+    return String(text).split(/\r?\n/).map(line=>{
+      const t=line.trim();
+      if(!t)return '<div class="ai-gap"></div>';
+      if(/^周[一二三四五六日]$/.test(t))return `<h3 class="ai-day">${e(t)}</h3>`;
+      return `<p class="ai-line">${e(t)}</p>`;
+    }).join('');
+  }
+  function showAiError(message){
+    const node=document.getElementById('aiError');if(!node)return;
+    node.textContent=message;node.hidden=!message;
+  }
+  function friendlyPlanError(raw){
+    const text=String(raw||'');
+    if(/Failed to send a request|Failed to fetch|NetworkError|timeout/i.test(text))return '方案服务暂时连不上，请确认 generate-plan 已部署，并检查网络后再试。';
+    if(/invalid.*jwt|jwt expired|401|unauthor/i.test(text))return '登录状态已过期，请退出后重新登录再试。';
+    if(/频繁|429|rate limit/i.test(text))return '生成请求太频繁了，请等一会儿再试。';
+    return text||'生成失败，请稍后再试。';
+  }
+  async function readFunctionError(error){
+    try{
+      const response=error&&error.context;
+      if(response&&typeof response.json==='function'){const body=await response.json();if(body&&body.error)return String(body.error);}
+    }catch(_){/* 响应不是 JSON，退回原始信息 */}
+    return String((error&&error.message)||error||'');
+  }
+  async function generateAiPlan(){
+    if(aiBusy)return;
+    const input=document.getElementById('aiHobby'),out=document.getElementById('aiOut');
+    const btn=document.querySelector('[data-action="ai-generate"]');
+    const hobby=(input?input.value:'').trim();
+    showAiError('');
+    if(!authClient){showAiError('还没有配置 Supabase，暂时无法调用方案生成。');return;}
+    if(!hobby){showAiError('先写下一个想细化的兴趣，例如「学吉他」。');if(input)input.focus();return;}
+    aiBusy=true;
+    if(btn){btn.disabled=true;btn.innerHTML='正在生成…';}
+    if(out){out.hidden=false;out.innerHTML='<p class="ai-loading">正在生成这一周的具体安排，大约需要几秒…</p>';}
+    try{
+      const {data,error}=await authClient.functions.invoke('generate-plan',{body:{hobby}});
+      if(error)throw new Error(await readFunctionError(error));
+      const text=String((data&&data.plan)||'').trim();
+      if(!text)throw new Error('模型没有返回方案内容，请换一个更具体的兴趣再试。');
+      aiPlan={hobby,text};
+      if(out)out.innerHTML=planMarkup(text);
+      toast('方案已生成，可以作为这一周的参考。');
+    }catch(error){
+      if(out){out.hidden=true;out.innerHTML='';}
+      showAiError(friendlyPlanError((error&&error.message)||error));
+    }finally{
+      aiBusy=false;
+      if(btn){btn.disabled=false;btn.innerHTML=icon('plus')+'生成细化方案';}
+    }
+  }
   function renderPace(){
     main.innerHTML=pageHead('找到适合自己的节奏','计划应该配合你的生活。状态变了，随时回来调整。')+`
     <div class="profile-grid"><form id="paceForm"><section class="form-section"><label class="field-label" for="weeklyHours">每周想留多少时间给兴趣<output id="weeklyHoursValue">${state.person.weeklyHours} 小时</output></label><p class="field-help">这是你能舒服投入的时间，不是需要完成的任务量。</p><input id="weeklyHours" name="weeklyHours" type="range" min="2" max="20" step="1" value="${state.person.weeklyHours}"><div class="range-labels"><span>2 小时</span><span>20 小时</span></div></section>
@@ -2114,7 +2193,7 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
       'add-entry':()=>openEntry(),'edit-entry':()=>openEntry(id),'ask-delete-entry':()=>askDeleteEntry(id),
       'confirm-delete-entry':()=>{state.sessions=state.sessions.filter(s=>!(s.id===id&&isCustom(s)));saveState();closeDialog();render();toast('已删除这条日程。');},
       'close-dialog':closeDialog,'about':showAbout,'settings':()=>{document.getElementById('mobileNav').close();showSettings();},
-      'logout':logout,'admin-refresh':()=>loadAdminLogs(true),
+      'logout':logout,'admin-refresh':()=>loadAdminLogs(true),'ai-generate':generateAiPlan,
       'menu':()=>document.getElementById('mobileNav').showModal(),'close-menu':()=>document.getElementById('mobileNav').close(),
       'dismiss-toast':()=>document.getElementById('toast').hidden=true,
       'toggle-active':()=>{const a=interest(id);a.active=!a.active;saveState();closeDialog();render();toast(a.active?'会在下次生成周计划时安排这个兴趣。':'已先存起来，已有安排会继续保留。');},
