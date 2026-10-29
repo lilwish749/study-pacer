@@ -1,11 +1,9 @@
 // Supabase Edge Function: generate-plan
-// 作用：把前端的兴趣输入转给 Cerebras（OpenAI 兼容接口），返回一周细化方案。
+// 作用：把前端的兴趣输入转给 Groq（OpenAI 兼容接口），返回一周细化方案。
 // 密钥只从服务端环境变量读取，绝不下发到前端。
 
-const CEREBRAS_BASE = 'https://api.cerebras.ai/v1';
-// Cerebras 的模型标识带连字符，可用 CEREBRAS_MODEL 覆盖默认值。
-const PRIMARY_MODEL = Deno.env.get('CEREBRAS_MODEL') || 'llama-3.3-70b';
-const FALLBACK_MODEL = 'llama-3.1-8b';
+const GROQ_BASE = 'https://api.groq.com/openai/v1';
+const MODEL = Deno.env.get('GROQ_MODEL') || 'llama-3.3-70b-versatile';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -52,59 +50,51 @@ function systemPrompt(hobby: string): string {
 现在请为「${hobby}」生成下一周的方案。如果某天的“活动”描述少于 20 字，请重新生成那一天的内容。`;
 }
 
-// 依次尝试主模型与备用模型，返回纯文本方案。
-async function callCerebras(apiKey: string, hobby: string): Promise<string> {
-  const models = [PRIMARY_MODEL, FALLBACK_MODEL].filter((m, i, all) => all.indexOf(m) === i);
-  let lastDetail = '';
+async function callGroq(apiKey: string, hobby: string): Promise<string> {
+  const response = await fetch(`${GROQ_BASE}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt(hobby) },
+        { role: 'user', content: `兴趣爱好：${hobby}` },
+      ],
+      temperature: 0.6,
+      max_tokens: 2400,
+    }),
+  });
 
-  for (const model of models) {
-    const response = await fetch(`${CEREBRAS_BASE}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt(hobby) },
-          { role: 'user', content: `兴趣爱好：${hobby}` },
-        ],
-        temperature: 0.6,
-        max_tokens: 2400,
-      }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const text = String(data?.choices?.[0]?.message?.content || '').trim();
-      if (text) return text;
-      lastDetail = '模型没有返回内容。';
-      continue;
-    }
-
+  if (!response.ok) {
     const detail = (await response.text()).slice(0, 300);
-    lastDetail = `Cerebras ${response.status}: ${detail}`;
+    console.error(`Groq ${response.status}: ${detail}`);
 
     if (response.status === 429) throw new Error('生成请求太频繁了，请等一会儿再试。');
     if (response.status === 401 || response.status === 403) {
-      throw new Error('CEREBRAS_API_KEY 无效或没有权限，请在 Supabase 中重新设置密钥。');
+      throw new Error('GROQ_API_KEY 无效或没有权限，请在 Supabase 中重新设置密钥。');
     }
-    // 400 / 404 通常是模型名不可用，换下一个模型再试。
-    if (response.status === 400 || response.status === 404) continue;
+    if (response.status === 400 || response.status === 404) {
+      throw new Error('模型名称不可用，请检查 GROQ_MODEL 设置。');
+    }
     throw new Error('方案服务暂时不可用，请稍后再试。');
   }
 
-  throw new Error(lastDetail || '方案服务暂时不可用，请稍后再试。');
+  const data = await response.json();
+  const text = String(data?.choices?.[0]?.message?.content || '').trim();
+  if (!text) throw new Error('模型没有返回内容，请稍后再试。');
+  return text;
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
   if (req.method !== 'POST') return json({ error: '只支持 POST 请求。' }, 405);
 
-  const apiKey = Deno.env.get('CEREBRAS_API_KEY');
+  const apiKey = Deno.env.get('GROQ_API_KEY');
   if (!apiKey) {
-    return json({ error: '服务端还没有配置 CEREBRAS_API_KEY，请先在 Supabase 中设置。' }, 500);
+    return json({ error: '服务端还没有配置 GROQ_API_KEY，请先在 Supabase 中设置。' }, 500);
   }
 
   let hobby = '';
@@ -119,7 +109,7 @@ Deno.serve(async (req: Request) => {
   if (hobby.length > 40) hobby = hobby.slice(0, 40);
 
   try {
-    const plan = await callCerebras(apiKey, hobby);
+    const plan = await callGroq(apiKey, hobby);
     return json({ plan });
   } catch (error) {
     const message = String((error as Error)?.message || '方案生成失败，请稍后再试。');
