@@ -28,6 +28,31 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 @media print{.sidebar,.topbar,.btn,.text-btn,.icon-btn,.head-actions,.toolbar,.check-wrap{display:none!important}.shell{display:block}.content{padding:0;color:#000}body{background:#fff;color:#000}.muted,.note,.eyebrow{color:#444}.week-grid{grid-template-columns:repeat(7,minmax(0,1fr))}.day-column{min-height:250px}.week-block{background:#eee;color:#000}.day-heading strong,.week-block .block-time{color:#000}}
 </style>
+<style>
+/* 登录门禁 + 管理后台 */
+.auth-gate{position:fixed;inset:0;z-index:99;display:grid;place-items:center;padding:24px;overflow:auto;background:radial-gradient(1200px 700px at 50% -10%,#1b1636 0%,#080808 62%)}
+.auth-gate[hidden]{display:none}
+.auth-card{width:min(432px,100%);background:var(--surface);border:1px solid var(--line);padding:34px 30px;box-shadow:0 30px 90px #000a}
+.auth-card h1{font-size:32px;margin:14px 0 9px;letter-spacing:-.03em}
+.auth-card .auth-lead{color:var(--muted);font-size:13px;line-height:1.75;margin:0 0 22px}
+.auth-tabs{display:flex;border:1px solid var(--line);margin-bottom:22px}
+.auth-tab{flex:1;background:none;border:0;color:var(--muted);padding:12px 0;font:600 11px/1 var(--font);letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+.auth-tab.active{background:var(--accent);color:var(--ink)}
+.auth-submit{width:100%;justify-content:center;margin-top:18px}
+.auth-foot{color:#8a8a8a;font-size:11px;line-height:1.7;margin:20px 0 0;border-top:1px solid var(--line);padding-top:14px}
+.auth-setup{font-size:12px;line-height:1.8;color:var(--warning)}
+.auth-setup code{background:#000;color:var(--text);padding:2px 6px;font-size:11px;word-break:break-all}
+.admin-panel{border:1px solid var(--line);background:var(--surface)}
+.admin-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line)}
+.admin-toolbar input{background:var(--bg);border:1px solid var(--line);color:var(--text);padding:9px 12px;font:inherit;font-size:12px;min-width:190px}
+.admin-table-wrap{overflow:auto;max-height:62vh}
+.admin-table{width:100%;border-collapse:collapse;font-size:12px}
+.admin-table th{position:sticky;top:0;z-index:1;background:var(--sidebar);color:var(--muted);text-align:left;font:600 10px/1.4 var(--font);letter-spacing:.1em;text-transform:uppercase;padding:12px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+.admin-table td{padding:12px 14px;border-bottom:1px solid #262626;vertical-align:top}
+.admin-table td.ua{max-width:420px;color:var(--muted);font-size:11px;line-height:1.65}
+.admin-empty td{color:var(--muted);text-align:center;padding:34px 14px}
+@media(max-width:760px){.auth-card{padding:28px 22px}.auth-card h1{font-size:27px}.admin-table td.ua{max-width:220px}}
+</style>
 </head>
 <body>
 <a href="#main" class="skip">跳到主要内容</a>
@@ -36,13 +61,14 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
   <a class="brand" href="#today"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>学习配速器<small>STUDY PACER</small></span></a>
   <span class="nav-caption">你的学习空间</span><nav class="nav" id="desktopNav"></nav>
   <div class="sidebar-note"><strong>一次只专注一件事</strong><p>把想做的事收好<br>再为它留一点时间</p></div>
-  <div class="sidebar-bottom"><button class="text-btn" data-action="about">关于这个预览 <span aria-hidden="true">↗</span></button><br><button class="text-btn" data-action="settings">设置与备份</button><div class="local-user"><span class="avatar" aria-hidden="true">P</span><div>我的学习空间<small id="saveStatus">示例数据 · 保存在本机</small></div></div></div>
+  <div class="sidebar-bottom"><button class="text-btn" data-action="about">关于这个预览 <span aria-hidden="true">↗</span></button><br><button class="text-btn" data-action="settings">设置与备份</button><br><button class="text-btn" id="logoutBtn" data-action="logout" hidden>退出登录</button><div class="local-user"><span class="avatar" id="userAvatar" aria-hidden="true">P</span><div><span id="userName">我的学习空间</span><small id="saveStatus">示例数据 · 保存在本机</small></div></div></div>
  </aside>
  <div class="workspace"><header class="topbar"><button class="icon-btn mobile-menu" data-action="menu" aria-label="打开导航">☰</button><div class="crumb">我的空间 <span aria-hidden="true">/</span><span id="breadcrumb">今日</span></div><div class="spacer"></div><span class="date-label small muted">2026 年 10 月</span><span class="preview-badge">PREVIEW 01</span><button class="icon-btn" data-action="about" aria-label="查看预览说明">?</button></header><main id="main" class="content" tabindex="-1"></main></div>
 </div>
 <dialog id="modal" aria-labelledby="modalTitle"></dialog>
-<dialog id="mobileNav" class="mobile-drawer" aria-label="主导航"><div class="drawer-inner"><div class="drawer-close"><strong>学习配速器</strong><button class="icon-btn" data-action="close-menu" aria-label="关闭导航">✕</button></div><p class="eyebrow">YOUR LEARNING SPACE</p><nav class="nav" id="mobileNavLinks"></nav><button class="text-btn" data-action="about">关于这个预览 ↗</button><br><button class="text-btn" data-action="settings">设置与备份</button></div></dialog>
+<dialog id="mobileNav" class="mobile-drawer" aria-label="主导航"><div class="drawer-inner"><div class="drawer-close"><strong>学习配速器</strong><button class="icon-btn" data-action="close-menu" aria-label="关闭导航">✕</button></div><p class="eyebrow">YOUR LEARNING SPACE</p><nav class="nav" id="mobileNavLinks"></nav><button class="text-btn" data-action="about">关于这个预览 ↗</button><br><button class="text-btn" data-action="settings">设置与备份</button><br><button class="text-btn" id="mobileLogoutBtn" data-action="logout" hidden>退出登录</button></div></dialog>
 <div id="toast" class="toast" role="status" hidden></div>
+<div id="authGate" class="auth-gate" hidden aria-label="登录或注册"></div>
 <script>
 /* RETAINED CORE: engine.js — original uploaded algorithm */
 /* 评分引擎 —— UMD 风格，纯函数，浏览器和 Node 均可使用 */
@@ -1312,6 +1338,8 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script>
+<script src="vendor/supabase.js"></script>
+<script src="supabase-config.js"></script>
 <script>
 /*
   STUDY PACER — REVIEW PREVIEW
@@ -1344,6 +1372,14 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
     {id:'week',name:'周计划',icon:'calendar',en:'WEEKLY PLAN'},
     {id:'pace',name:'我的节奏',icon:'sliders',en:'MY PACE'}
   ];
+  const ADMIN_NAV = {id:'admin',name:'管理后台',icon:'shield',en:'ADMIN'};
+  // AUTH — 用户名密码通过 Supabase 邮箱认证模拟，邮箱统一拼接固定占位域名。
+  const SUPABASE_URL = (window.STUDY_PACER_SUPABASE || {}).url || '';
+  const SUPABASE_ANON_KEY = (window.STUDY_PACER_SUPABASE || {}).anonKey || '';
+  const AUTH_DOMAIN = 'study-pacer.local';
+  let authClient = null, currentUser = null, currentProfile = null, isAdmin = false;
+  let authMode = 'login', authBusy = false, adminLogs = null;
+  function navItems(){return isAdmin ? NAV.concat(ADMIN_NAV) : NAV;}
   const ICONS = {
     sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
     stack:'<path d="m3 7 9-5 9 5-9 5-9-5Zm0 5 9 5 9-5M3 17l9 5 9-5"/>',
@@ -1356,7 +1392,9 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
     download:'<path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/>',
     close:'<path d="m6 6 12 12M6 18 18 6"/>',
     clock:'<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>',
-    check:'<path d="m5 12 5 5L20 7"/>'
+    check:'<path d="m5 12 5 5L20 7"/>',
+    shield:'<path d="M12 3 5 6v5c0 4.6 3 7.7 7 9 4-1.3 7-4.4 7-9V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>',
+    refresh:'<path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/>'
   };
   const SAMPLE_ACTIVITIES = [
   {
@@ -1704,22 +1742,221 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
     node.hidden=false;clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>node.hidden=true,5500);
   }
   function button(action,label,options={}){return `<button class="btn ${options.primary?'primary':''} ${options.className||''}" data-action="${action}" ${options.id?`data-id="${e(options.id)}"`:''}>${options.icon?icon(options.icon):''}${label}</button>`;}
-  function pageHead(title,subtitle,actions=''){return `<div class="page-head"><div><p class="eyebrow" style="margin:0 0 9px">${NAV.find(n=>n.id===page).en}</p><h1 tabindex="-1">${title}</h1><p>${subtitle}</p></div><div class="head-actions">${actions}</div></div>`;}
+  function pageHead(title,subtitle,actions=''){return `<div class="page-head"><div><p class="eyebrow" style="margin:0 0 9px">${navItems().find(n=>n.id===page).en}</p><h1 tabindex="-1">${title}</h1><p>${subtitle}</p></div><div class="head-actions">${actions}</div></div>`;}
   function navigation(){
-    const markup=NAV.map(n=>`<a href="#${n.id}" ${n.id===page?'aria-current="page"':''}>${icon(n.icon)}<span>${n.name}</span><span class="nav-num">0${NAV.indexOf(n)+1}</span></a>`).join('');
+    const markup=navItems().map((n,i)=>`<a href="#${n.id}" ${n.id===page?'aria-current="page"':''}>${icon(n.icon)}<span>${n.name}</span><span class="nav-num">0${i+1}</span></a>`).join('');
     document.getElementById('desktopNav').innerHTML=markup;
     document.getElementById('mobileNavLinks').innerHTML=markup;
-    document.getElementById('breadcrumb').textContent=NAV.find(n=>n.id===page).name;
+    document.getElementById('breadcrumb').textContent=navItems().find(n=>n.id===page).name;
   }
   function render(){
-    navigation();({today:renderToday,interests:renderInterests,week:renderWeek,pace:renderPace}[page])();updateSaveStatus();
+    navigation();({today:renderToday,interests:renderInterests,week:renderWeek,pace:renderPace,admin:renderAdmin}[page])();updateSaveStatus();
   }
   function route(){
+    if(!currentUser)return;
     const id=location.hash.slice(1);
     if(id==='main')return;
-    page=NAV.some(n=>n.id===id)?id:'today';
+    if(id==='admin'&&!isAdmin){page='today';toast('管理后台只对管理员开放。');}
+    else page=navItems().some(n=>n.id===id)?id:'today';
     render();document.getElementById('mobileNav').close();window.scrollTo(0,0);
     main.querySelector('h1')?.focus({preventScroll:true});
+  }
+  // 2. AUTH — Supabase 邮箱密码认证 + 用户名模拟
+  function authEmail(username){return username.toLowerCase()+'@'+AUTH_DOMAIN;}
+  function authConfigured(){return !!(SUPABASE_URL&&SUPABASE_ANON_KEY&&window.supabase);}
+  function friendlyAuthError(err){
+    const msg=String(err?.message||err||'');
+    if(/Invalid login credentials/i.test(msg))return '用户名或密码不正确。';
+    if(/Email not confirmed/i.test(msg))return '账号还在等待邮箱确认。请先在 Supabase 关闭 Confirm email，再重新注册。';
+    if(/already registered|already exists|duplicate key/i.test(msg))return '这个用户名已被占用，换一个试试。';
+    if(/password should be at least/i.test(msg))return '密码太短，至少 6 位。';
+    if(/Signups not allowed/i.test(msg))return '当前项目关闭了注册，请在 Supabase 允许 Email 注册。';
+    if(/rate limit|too many/i.test(msg))return '尝试太频繁，请稍等一会儿再试。';
+    if(/Failed to fetch|NetworkError|network/i.test(msg))return '网络连接失败，请检查网络后再试。';
+    if(/profiles|login_logs|does not exist|schema/i.test(msg))return '数据库还未初始化，请先在 Supabase 执行 supabase/schema.sql。';
+    return msg||'操作失败，请稍后再试。';
+  }
+  function authGateMarkup(notice=''){
+    const missing=!authConfigured();
+    return `<div class="auth-card">
+      <div style="display:flex;align-items:center;gap:10px"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong style="letter-spacing:.2em;font-size:11px">STUDY PACER</strong></div>
+      <h1>${authMode==='signup'?'创建你的学习空间':'欢迎回来'}</h1>
+      <p class="auth-lead">${authMode==='signup'?'用用户名和密码注册，不需要真实邮箱，也不会发送短信。':'输入用户名和密码，继续今天的学习计划。'}</p>
+      ${missing?`<p class="auth-setup">还没有配置 Supabase。请先在 <code>supabase-config.js</code> 中填入 Project URL 与 anon public key，并在 SQL Editor 执行 <code>supabase/schema.sql</code>，然后刷新本页。</p>`:`
+      <div class="auth-tabs" role="tablist">
+        <button type="button" class="auth-tab ${authMode==='login'?'active':''}" data-auth-tab="login" role="tab" aria-selected="${authMode==='login'}">登录</button>
+        <button type="button" class="auth-tab ${authMode==='signup'?'active':''}" data-auth-tab="signup" role="tab" aria-selected="${authMode==='signup'}">注册</button>
+      </div>
+      <form id="authForm" novalidate>
+        <div class="field"><label for="authUsername">用户名</label><input id="authUsername" name="username" maxlength="32" autocomplete="username" placeholder="2–32 位字母、数字或 _ -" required><p class="note">仅支持英文、数字、下划线和短横线。</p></div>
+        <div class="field"><label for="authPassword">密码</label><input id="authPassword" type="password" name="password" minlength="6" maxlength="72" autocomplete="${authMode==='signup'?'new-password':'current-password'}" placeholder="至少 6 位" required><p class="note">密码由 Supabase 加密保存，本页不保存明文。</p></div>
+        <p id="authError" class="field-error" role="alert" hidden></p>
+        <p id="authNotice" class="note" role="status" ${notice?'':'hidden'}>${e(notice)}</p>
+        <button class="btn primary auth-submit" id="authSubmit" type="submit">${authMode==='signup'?'注册并进入':'登录'}</button>
+      </form>
+      <p class="auth-foot">登录状态由 Supabase 管理；学习计划数据仍保存在这台设备上。</p>`}
+    </div>`;
+  }
+  function showAuthGate(notice=''){
+    const gate=document.getElementById('authGate');
+    gate.innerHTML=authGateMarkup(notice);
+    gate.hidden=false;
+    authBusy=false;
+    document.body.style.overflow='hidden';
+    setTimeout(()=>document.getElementById('authUsername')?.focus({preventScroll:true}),60);
+  }
+  function hideAuthGate(){
+    document.getElementById('authGate').hidden=true;
+    document.body.style.overflow='';
+  }
+  function setAuthMode(mode){
+    if(authBusy||mode===authMode)return;
+    authMode=mode;
+    showAuthGate();
+  }
+  function authError(message){
+    const node=document.getElementById('authError');
+    if(!node)return;
+    node.textContent=message;node.hidden=false;
+  }
+  function setAuthBusy(busy){
+    authBusy=busy;
+    const submit=document.getElementById('authSubmit');
+    if(submit){submit.disabled=busy;submit.textContent=busy?'请稍候…':(authMode==='signup'?'注册并进入':'登录');}
+  }
+  async function ensureProfile(user,fallback){
+    const {data,error}=await authClient.from('profiles').select('id,username,is_admin').eq('id',user.id).maybeSingle();
+    if(error)throw new Error('读取资料失败：'+error.message+'。请确认已执行 supabase/schema.sql。');
+    if(data)return data;
+    const username=(fallback||user.user_metadata?.username||String(user.email||'').split('@')[0]||'user').slice(0,32);
+    const {error:insertError}=await authClient.from('profiles').insert({id:user.id,username});
+    if(insertError)throw new Error('创建资料失败：'+insertError.message);
+    return {id:user.id,username,is_admin:false};
+  }
+  async function logLogin(user,username){
+    const {error}=await authClient.from('login_logs').insert({user_id:user.id,username,user_agent:String(navigator.userAgent||'').slice(0,500)});
+    if(error){console.warn('login log failed',error);return false;}
+    return true;
+  }
+  async function signUp(username,password){
+    const {data,error}=await authClient.auth.signUp({email:authEmail(username),password,options:{data:{username}}});
+    if(error)throw new Error(friendlyAuthError(error));
+    if(!data.session)throw new Error('注册已提交，但 Supabase 仍要求邮箱确认。请在 Authentication → Providers → Email 关闭 Confirm email 后重新注册。');
+    const user=data.user;
+    const {error:profileError}=await authClient.from('profiles').insert({id:user.id,username});
+    if(profileError){
+      await authClient.auth.signOut();
+      throw new Error(profileError.code==='23505'?'这个用户名已被占用，换一个试试。':friendlyAuthError(profileError));
+    }
+    const profile=await ensureProfile(user,username);
+    await logLogin(user,profile.username);
+    enterApp(user,profile,'注册成功，先安排今天的一件小事吧。');
+  }
+  async function signIn(username,password){
+    const {data,error}=await authClient.auth.signInWithPassword({email:authEmail(username),password});
+    if(error)throw new Error(friendlyAuthError(error));
+    const user=data.user,profile=await ensureProfile(user,username);
+    enterApp(user,profile);
+    const logged=await logLogin(user,profile.username);
+    toast(logged?'已登录，欢迎回来。':'已登录，但登录日志写入失败，请确认已执行 schema.sql。');
+  }
+  async function handleAuthSubmit(form){
+    if(authBusy)return;
+    if(!authConfigured()){authError('尚未配置 Supabase，请先填写 supabase-config.js。');return;}
+    const username=String(form.username.value||'').trim(),password=String(form.password.value||'');
+    if(!/^[a-zA-Z0-9_-]{2,32}$/.test(username)){authError('用户名需为 2–32 位字母、数字、下划线或短横线。');return;}
+    if(password.length<6){authError('密码至少 6 位。');return;}
+    setAuthBusy(true);
+    try{
+      if(authMode==='signup')await signUp(username,password);
+      else await signIn(username,password);
+    }catch(err){authError(friendlyAuthError(err));}
+    finally{setAuthBusy(false);}
+  }
+  function paintUser(){
+    const nameNode=document.getElementById('userName'),avatar=document.getElementById('userAvatar');
+    const logoutBtn=document.getElementById('logoutBtn'),mobileLogout=document.getElementById('mobileLogoutBtn');
+    if(currentProfile){
+      nameNode.textContent=currentProfile.username;
+      avatar.textContent=currentProfile.username.slice(0,1).toUpperCase();
+      if(logoutBtn)logoutBtn.hidden=false;
+      if(mobileLogout)mobileLogout.hidden=false;
+    }else{
+      nameNode.textContent='我的学习空间';
+      avatar.textContent='P';
+      if(logoutBtn)logoutBtn.hidden=true;
+      if(mobileLogout)mobileLogout.hidden=true;
+    }
+  }
+  function enterApp(user,profile,message){
+    currentUser=user;currentProfile=profile;isAdmin=!!profile.is_admin;adminLogs=null;
+    paintUser();hideAuthGate();
+    if(location.hash==='#admin'&&!isAdmin)history.replaceState(null,'',location.pathname+location.search);
+    route();
+    if(message)toast(message);
+  }
+  async function logout(){
+    if(authClient){try{await authClient.auth.signOut();}catch(err){console.warn(err);}}
+    currentUser=null;currentProfile=null;isAdmin=false;adminLogs=null;page='today';
+    if(location.hash)history.replaceState(null,'',location.pathname+location.search);
+    paintUser();showAuthGate('已退出登录。');
+  }
+  async function startAuth(){
+    if(!authConfigured()){showAuthGate();return;}
+    authClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+    try{
+      const {data}=await authClient.auth.getSession();
+      if(data.session){
+        const profile=await ensureProfile(data.session.user);
+        enterApp(data.session.user,profile);
+        return;
+      }
+    }catch(err){console.warn(err);}
+    showAuthGate('用用户名和密码登录，或注册一个新账号。');
+  }
+  // ADMIN — 只有 profiles.is_admin = true 的登录用户能读取登录日志
+  function formatLogTime(value){
+    const date=new Date(value);
+    if(Number.isNaN(date.getTime()))return String(value||'');
+    return date.toLocaleString('zh-CN',{hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }
+  function paintAdminRows(){
+    const tbody=document.getElementById('adminRows');
+    if(!tbody)return;
+    const query=(document.getElementById('adminFilter')?.value||'').trim().toLowerCase();
+    const rows=(adminLogs||[]).filter(r=>!query||String(r.username||'').toLowerCase().includes(query));
+    const count=document.getElementById('adminCount');
+    if(count)count.textContent=rows.length+' 条';
+    tbody.innerHTML=rows.length?rows.map(r=>{
+      const ua=String(r.user_agent||'未知设备');
+      return `<tr><td><strong>${e(r.username)}</strong></td><td>${e(formatLogTime(r.login_at))}</td><td class="ua" title="${e(ua)}">${e(ua.length>90?ua.slice(0,90)+'…':ua)}</td></tr>`;
+    }).join(''):'<tr class="admin-empty"><td colspan="3">还没有登录记录。</td></tr>';
+  }
+  async function loadAdminLogs(force){
+    if(!authClient||!isAdmin)return;
+    if(adminLogs&&!force){paintAdminRows();return;}
+    const tbody=document.getElementById('adminRows');
+    if(!tbody)return;
+    tbody.innerHTML='<tr class="admin-empty"><td colspan="3">正在读取登录记录…</td></tr>';
+    const {data,error}=await authClient.from('login_logs').select('username,login_at,user_agent').order('login_at',{ascending:false}).limit(500);
+    if(error){
+      tbody.innerHTML=`<tr class="admin-empty"><td colspan="3" class="field-error">读取失败：${e(error.message)}<br>请确认已执行 schema.sql，并已把当前账号设为管理员。</td></tr>`;
+      return;
+    }
+    adminLogs=data||[];
+    paintAdminRows();
+  }
+  function renderAdmin(){
+    if(!isAdmin){
+      main.innerHTML=`<div class="quiet-panel"><p class="eyebrow">ADMIN</p><h1>无权限</h1><p>这个页面只对管理员开放。</p><p class="note">如果这是你的账号，请在 Supabase 中执行：<br><code>update public.profiles set is_admin = true where username = '你的用户名';</code></p></div>`;
+      return;
+    }
+    main.innerHTML=pageHead('登录记录','所有用户的登录时间与设备信息 · 仅管理员可见',button('admin-refresh','刷新',{icon:'refresh'}))+`
+    <section class="admin-panel">
+      <div class="admin-toolbar"><label for="adminFilter" class="eyebrow" style="margin:0">筛选用户名</label><input id="adminFilter" placeholder="输入用户名的一部分"><span class="spacer"></span><span class="note" id="adminCount">—</span></div>
+      <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>用户名</th><th>登录时间</th><th>User Agent</th></tr></thead><tbody id="adminRows"><tr class="admin-empty"><td colspan="3">正在读取登录记录…</td></tr></tbody></table></div>
+    </section>`;
+    loadAdminLogs();
   }
   function openDialog(title,body,footer='',eyebrow='STUDY PACER'){
     if(modal.open)modal.close();
@@ -1866,6 +2103,7 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
 
   // 5. EVENTS — User actions dispatch to the named functions above.
   document.addEventListener('click',event=>{
+    const authTab=event.target.closest('[data-auth-tab]');if(authTab){setAuthMode(authTab.dataset.authTab);return;}
     const filter=event.target.closest('[data-filter]');if(filter){interestFilter=filter.dataset.filter;renderInterests();return;}
     const view=event.target.closest('[data-week-view]');if(view){weekView=view.dataset.weekView;renderWeek();return;}
     const day=event.target.closest('[data-day]');if(day){selectedDay=day.dataset.day;renderWeek();return;}
@@ -1876,6 +2114,7 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
       'add-entry':()=>openEntry(),'edit-entry':()=>openEntry(id),'ask-delete-entry':()=>askDeleteEntry(id),
       'confirm-delete-entry':()=>{state.sessions=state.sessions.filter(s=>!(s.id===id&&isCustom(s)));saveState();closeDialog();render();toast('已删除这条日程。');},
       'close-dialog':closeDialog,'about':showAbout,'settings':()=>{document.getElementById('mobileNav').close();showSettings();},
+      'logout':logout,'admin-refresh':()=>loadAdminLogs(true),
       'menu':()=>document.getElementById('mobileNav').showModal(),'close-menu':()=>document.getElementById('mobileNav').close(),
       'dismiss-toast':()=>document.getElementById('toast').hidden=true,
       'toggle-active':()=>{const a=interest(id);a.active=!a.active;saveState();closeDialog();render();toast(a.active?'会在下次生成周计划时安排这个兴趣。':'已先存起来，已有安排会继续保留。');},
@@ -1899,9 +2138,12 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
     if(input.id==='weeklyHours')document.getElementById('weeklyHoursValue').textContent=input.value+' 小时';
     if(input.id==='focusBlock')document.getElementById('focusBlockValue').textContent=input.value+' 分钟';
     if(input.id==='recovery')document.getElementById('recoveryValue').textContent=Math.round(Number(input.value)*100)+'%';
+    if(input.id==='adminFilter')paintAdminRows();
   });
   document.addEventListener('submit',event=>{
-    const form=event.target;if(!['paceForm','interestForm','moveForm','entryForm'].includes(form.id))return;event.preventDefault();
+    const form=event.target;
+    if(form.id==='authForm'){event.preventDefault();handleAuthSubmit(form);return;}
+    if(!['paceForm','interestForm','moveForm','entryForm'].includes(form.id))return;event.preventDefault();
     const data=new FormData(form);
     if(form.id==='paceForm'){
       Object.assign(state.person,{weeklyHours:Number(data.get('weeklyHours')),block:Number(data.get('block')),peakTime:data.get('peakTime'),recovery:Number(data.get('recovery'))});
@@ -1952,7 +2194,7 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
   modal.addEventListener('click',event=>{if(event.target===modal){const r=modal.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)closeDialog();}});
   document.getElementById('mobileNav').addEventListener('click',event=>{if(event.target.closest('a'))document.getElementById('mobileNav').close();});
   window.addEventListener('hashchange',route);
-  route();
+  startAuth();
 })();
 
 </script>
