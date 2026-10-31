@@ -2861,11 +2861,11 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   }
   function moveSession(id){
     const s=state.sessions.find(s=>s.id===id),a=s&&interest(s.interestId);if(!s)return;
-    openDialog('换个更合适的时间',`<form id="moveForm" data-session="${e(id)}"><div class="dialog-body"><p class="dialog-lead">${e(activityName(a))} · 原安排 ${dateLabel(s.date)} ${s.start}–${s.end}</p><div class="field"><label for="moveDate">日期</label><input type="date" id="moveDate" name="date" value="${s.date}" required></div><div class="form-pair"><div class="field"><label for="moveStart">开始时间</label><input type="time" id="moveStart" name="start" value="${s.start}" required></div><div class="field"><label for="moveDuration">持续分钟</label><input type="number" id="moveDuration" name="duration" min="15" max="90" step="5" value="${duration(s)}" required></div></div><p class="note">会检查可用时段、休息日，以及与其他练习的间隔。</p><p id="moveError" class="field-error" role="alert" hidden></p></div><div class="dialog-footer">${button('close-dialog','取消')}<button class="btn primary" type="submit">保存时间</button></div></form>`);
+    openDialog('换个更合适的时间',`<form id="moveForm" data-session="${e(id)}"><div class="dialog-body"><p class="dialog-lead">${e(activityName(a))} · 原安排 ${dateLabel(s.date)} ${s.start}–${s.end}</p><div class="field"><label for="moveDate">日期</label><input type="date" id="moveDate" name="date" value="${s.date}" required></div><div class="form-pair"><div class="field"><label for="moveStart">开始时间</label><input type="time" id="moveStart" name="start" value="${s.start}" required></div><div class="field"><label for="moveEnd">结束时间</label><input type="time" id="moveEnd" name="end" value="${s.end}" required></div></div><p class="note">会检查可用时段、休息日，以及与其他练习的间隔。</p><p id="moveError" class="field-error" role="alert" hidden></p></div><div class="dialog-footer">${button('close-dialog','取消')}<button class="btn primary" type="submit">保存时间</button></div></form>`);
   }
   function openEntry(id){
     const s=id?state.sessions.find(x=>x.id===id):null,custom=!!s;
-    openDialog(custom?'编辑日程':'添加自己的日程',`<form id="entryForm" data-entry="${custom?e(s.id):''}"><div class="dialog-body"><p class="dialog-lead">把课程、上班、项目或任何固定安排直接放进日历，不用先进兴趣池。</p><div class="field"><label for="entryTitle">安排名称</label><input id="entryTitle" name="title" maxlength="60" placeholder="例如：高等数学课、产品周会、毕业设计" value="${e(custom?s.title:'')}" required autofocus><p id="entryKindNote" class="category-note">${custom?`当前类型：${e(kindLabel(s))}。改名会自动重新识别。`:'输入名称后会自动识别类型，并按你的节奏估算这条日程的负荷。'}</p></div><div class="form-pair"><div class="field"><label for="entryKind">类型（自动识别，可调整）</label><select id="entryKind" name="kind">${SCHEDULE_KINDS.map(k=>`<option value="${k.key}" ${custom&&s.kind===k.key?'selected':''}>${k.label}</option>`).join('')}</select></div><div class="field"><label for="entryDate">日期</label><input type="date" id="entryDate" name="date" value="${custom?s.date:selectedDay}" required></div></div><div class="form-pair"><div class="field"><label for="entryStart">开始时间</label><input type="time" id="entryStart" name="start" value="${custom?s.start:'08:00'}" required></div><div class="field"><label for="entryDuration">持续分钟</label><input type="number" id="entryDuration" name="duration" min="15" max="480" step="5" value="${custom?duration(s):60}" required></div></div><div class="field"><label for="entryNote">备注（可选）</label><textarea id="entryNote" name="note" maxlength="120" placeholder="地点、老师，或者这件事要做到什么程度。">${e(custom?(s.note||''):'')}</textarea></div><div id="entryLoadPreview" class="load-preview"></div><p class="note">这类安排按真实时间填写，不受学习可用时段限制；保存时会检查与当天其他安排是否重叠。</p><p id="entryError" class="field-error" role="alert" hidden></p></div><div class="dialog-footer">${custom?button('ask-delete-entry','删除日程',{id:s.id,className:'danger'}):''}${button('close-dialog','取消')}<button class="btn primary" type="submit">${custom?'保存修改':'加入日历'}</button></div></form>`,'CUSTOM SCHEDULE / 自定义安排');
+    openDialog(custom?'编辑日程':'添加自己的日程',`<form id="entryForm" data-entry="${custom?e(s.id):''}"><div class="dialog-body"><p class="dialog-lead">把课程、上班、项目或任何固定安排直接放进日历，不用先进兴趣池。</p><div class="field"><label for="entryTitle">安排名称</label><input id="entryTitle" name="title" maxlength="60" placeholder="例如：高等数学课、产品周会、毕业设计" value="${e(custom?s.title:'')}" required autofocus><p id="entryKindNote" class="category-note">${custom?`当前类型：${e(kindLabel(s))}。改名会自动重新识别。`:'输入名称后会自动识别类型，并按你的节奏估算这条日程的负荷。'}</p></div><div class="form-pair"><div class="field"><label for="entryKind">类型（自动识别，可调整）</label><select id="entryKind" name="kind">${SCHEDULE_KINDS.map(k=>`<option value="${k.key}" ${custom&&s.kind===k.key?'selected':''}>${k.label}</option>`).join('')}</select></div><div class="field"><label for="entryDate">日期</label><input type="date" id="entryDate" name="date" value="${custom?s.date:selectedDay}" required></div></div><div class="form-pair"><div class="field"><label for="entryStart">开始时间</label><input type="time" id="entryStart" name="start" value="${custom?s.start:'08:00'}" required></div><div class="field"><label for="entryEnd">结束时间</label><input type="time" id="entryEnd" name="end" value="${custom?s.end:'09:00'}" required></div></div><div class="field"><label for="entryNote">备注（可选）</label><textarea id="entryNote" name="note" maxlength="120" placeholder="地点、老师，或者这件事要做到什么程度。">${e(custom?(s.note||''):'')}</textarea></div><div id="entryLoadPreview" class="load-preview"></div><p class="note">这类安排按真实时间填写，不受学习可用时段限制；保存时会检查与当天其他安排是否重叠。</p><p id="entryError" class="field-error" role="alert" hidden></p></div><div class="dialog-footer">${custom?button('ask-delete-entry','删除日程',{id:s.id,className:'danger'}):''}${button('close-dialog','取消')}<button class="btn primary" type="submit">${custom?'保存修改':'加入日历'}</button></div></form>`,'CUSTOM SCHEDULE / 自定义安排');
     paintEntryPreview();
   }
   // 输入名称时实时预览：自动识别类型 + 五档负荷。
@@ -3023,6 +3023,10 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
       if(note)note.textContent=input.value.trim()?`已自动识别为「${SCHEDULE_KINDS.find(k=>k.key===kind).label}」${cls.recognized?` · 学习方向：${cls.categoryLabel}`:''}`:'输入名称后会自动识别类型，并按你的节奏估算这条日程的负荷。';
       paintEntryPreview();
     }
+    if(input.id==='entryStart'||input.id==='moveStart'){
+      const end=document.getElementById(input.id==='entryStart'?'entryEnd':'moveEnd');
+      if(end&&input.value&&(!end.value||minutes(end.value)<=minutes(input.value)))end.value=hhmm(Math.min(minutes(input.value)+60,1439));
+    }
     if(input.id==='weeklyHours')document.getElementById('weeklyHoursValue').textContent=input.value+' 小时';
     if(input.id==='focusBlock')document.getElementById('focusBlockValue').textContent=input.value+' 分钟';
     if(input.id==='recovery')document.getElementById('recoveryValue').textContent=Math.round(Number(input.value)*100)+'%';
@@ -3048,10 +3052,11 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     if(form.id==='interestForm'){saveInterest(form,data);return;}
     if(form.id==='moveForm'){
       const s=state.sessions.find(s=>s.id===form.dataset.session);if(!s)return;
-      const date=String(data.get('date')||''),start=data.get('start'),min=Number(data.get('duration'));
+      const date=String(data.get('date')||''),start=data.get('start'),end=data.get('end');
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(Date.parse(date+'T00:00:00Z'))){showError('moveError','请选择一个有效日期。');return;}
-      if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!Number.isInteger(min)||min<15||min>90){showError('moveError','请填写有效时间和 15–90 分钟的时长。');return;}
-      const from=minutes(start),to=from+min,wd=weekdayOf(date);
+      if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end)){showError('moveError','请填写有效的开始与结束时间。');return;}
+      const from=minutes(start),to=minutes(end),min=to-from;if(min<15||min>90){showError('moveError','结束时间要比开始时间晚 15–90 分钟。');return;}
+      const wd=weekdayOf(date);
       const segments=(wd>=5?state.availability.weekend:state.availability.workday);
       if(state.availability.restDay.includes(DAY_NAMES[wd])){showError('moveError','这一天设为休息日，请换一天。');return;}
       if(!segments.some(seg=>from>=minutes(seg.start)&&to<=minutes(seg.end))){showError('moveError',wd>=5?'请选择周六 09:00–12:00 或 14:00–21:00 内的时段。':'请选择工作日 07:00–08:00 或 19:00–22:00 内的时段。');return;}
@@ -3061,20 +3066,20 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
       if(sessionScore(s).score>75&&others.some(o=>sessionScore(o).score>75)){showError('moveError','这一天已有一项高负荷练习，建议换一天。');return;}
       const same=others.filter(o=>o.interestId===s.interestId);
       if(same.length>=2||same.some(o=>Math.max(from-minutes(o.end),minutes(o.start)-to)<240)){showError('moveError','同一兴趣每天最多两次，两次之间至少隔 4 小时。');return;}
-      const before={...s};Object.assign(s,{date,start,end:hhmm(to)});
+      const before={...s};Object.assign(s,{date,start,end});
       if(weekLoad()>100){Object.assign(s,before);showError('moveError','调整后会超出当前周负荷容量，请减少时长或调整学习节奏。');return;}
       saveState();closeDialog();render();toast('时间已调整。');
     }
     if(form.id==='entryForm'){
       const editing=form.dataset.entry?state.sessions.find(x=>x.id===form.dataset.entry):null;
-      const title=String(data.get('title')||'').trim(),kind=String(data.get('kind')||'other'),date=data.get('date'),start=data.get('start'),min=Number(data.get('duration')),note=String(data.get('note')||'').trim();
+      const title=String(data.get('title')||'').trim(),kind=String(data.get('kind')||'other'),date=data.get('date'),start=data.get('start'),end=data.get('end'),note=String(data.get('note')||'').trim();
       if(!title){showError('entryError','先给这条安排起个名字。');return;}
-      if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!Number.isInteger(min)||min<15||min>480){showError('entryError','请填写有效时间和 15–480 分钟的时长。');return;}
-      const from=minutes(start),to=from+min;
-      if(to>1440){showError('entryError','结束时间不能超过当天 24:00，请调整开始时间或时长。');return;}
+      if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end)){showError('entryError','请填写有效的开始与结束时间。');return;}
+      const from=minutes(start),to=minutes(end),min=to-from;
+      if(min<15||min>480){showError('entryError','结束时间要比开始时间晚 15–480 分钟。');return;}
       const others=state.sessions.filter(o=>o.id!==editing?.id&&o.date===date);
       if(others.some(o=>minutes(o.start)<to&&from<minutes(o.end))){showError('entryError','与这一天已有的安排时间重叠，请换一个时段。');return;}
-      const item={...(editing||{}),id:editing?.id||'custom-'+Date.now().toString(36),date,start,end:hhmm(to),title,kind,note,done:editing?.done||false};
+      const item={...(editing||{}),id:editing?.id||'custom-'+Date.now().toString(36),date,start,end,title,kind,note,done:editing?.done||false};
       if(editing)state.sessions[state.sessions.indexOf(editing)]=item;else state.sessions.push(item);
       saveState();closeDialog();render();toast(editing?'日程已更新。':'已加入这一周的安排。');
     }
