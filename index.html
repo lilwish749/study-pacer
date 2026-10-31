@@ -1393,8 +1393,8 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
   const AUTH_DOMAIN = 'study-pacer.local';
   let authClient = null, currentUser = null, currentProfile = null, isAdmin = false;
   let authMode = 'login', authBusy = false, adminLogs = null;
-  // AI — 生成的方案保存在兴趣的 aiPlan 字段（随本地存储持久化）；dialogAiPlan 只暂存表单内未保存的方案。
-  let aiBusy = false, dialogAiPlan = null;
+  // AI — 新兴趣保存时自动生成方案并存在 aiPlan 字段（随本地存储持久化）；采纳进周计划时只用 AI 方案。
+  let aiBusy = false;
   function navItems(){return isAdmin ? NAV.concat(ADMIN_NAV) : NAV;}
   const ICONS = {
     sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
@@ -2063,31 +2063,25 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
     if(!text)throw new Error('模型没有返回方案内容，请换一个更具体的兴趣再试。');
     return text;
   }
-  // 记录/编辑兴趣的表单内生成：结果先暂存在 dialogAiPlan，随表单一起保存。
-  async function generateForInterestForm(){
-    if(aiBusy)return;
-    const nameEl=document.getElementById('interestName');
-    const err=document.getElementById('interestAiError'),out=document.getElementById('interestAiOut');
-    const btn=modal.querySelector('[data-action="ai-form-generate"]');
-    const hobby=(nameEl?nameEl.value:'').trim();
-    if(err){err.hidden=true;err.textContent='';}
-    if(!authClient){if(err){err.textContent='还没有配置 Supabase，暂时无法生成方案。';err.hidden=false;}return;}
-    if(!hobby){if(err){err.textContent='先填写兴趣名称，再生成方案。';err.hidden=false;}if(nameEl)nameEl.focus();return;}
-    aiBusy=true;
-    if(btn){btn.disabled=true;btn.textContent='正在生成…';}
-    if(out){out.hidden=false;out.innerHTML='<p class="ai-loading">正在生成这一周的具体安排，大约需要几秒…</p>';}
-    try{
-      const text=await requestPlan(hobby);
-      dialogAiPlan={hobby,text};
-      if(out)out.innerHTML=planMarkup(text)+'<p class="note" style="margin-top:10px">方案会随兴趣一起保存；保存后可在兴趣详情里采纳，自动放进周计划。</p>';
-    }catch(error){
-      dialogAiPlan=null;
-      if(out){out.hidden=true;out.innerHTML='';}
-      if(err){err.textContent=friendlyPlanError((error&&error.message)||error);err.hidden=false;}
-    }finally{
-      aiBusy=false;
-      if(btn){btn.disabled=false;btn.textContent='生成 AI 方案';}
+  // 保存兴趣：新兴趣存入兴趣池时自动生成 AI 方案；采纳进周计划时只使用这份方案。
+  async function saveInterest(form,data){
+    const name=data.get('name').trim(),domain=data.get('category');
+    if(!name){showError('interestError','先给这个兴趣起个名字。');return;}
+    if(state.interests.some(a=>a.id!==dialogInterestId&&activityName(a).toLowerCase()===name.toLowerCase())){showError('interestError','这个兴趣已经记下了，可以直接编辑原来的条目。');return;}
+    const axes=InterestClassifier.axesOf(domain),old=dialogInterestId?interest(dialogInterestId):null;
+    if(!axes){showError('interestError','请先选一个合适的类别。');return;}
+    const item={...axes,id:old?.id||'interest-'+Date.now().toString(36),name,short:name,domain,categoryLabel:InterestClassifier.byKey(domain).label,goal:data.get('goal').trim()||'先完成一份小练习，再慢慢调整。',hours:Number(data.get('hours')),active:data.has('active'),mark:old?.mark||name.slice(0,2),aiPlan:old?.aiPlan||null,cards:old?.cards||[{step:1,action:'选一个能在一段时间内完成的小练习',deliverable:'一份初步练习记录',tip:'只选一个小目标。'},{step:2,action:'根据第一次的记录再试一次',deliverable:'一份改进后的练习',tip:'记下一处进步就够了。'}]};
+    if(!old){
+      const submitBtn=form.querySelector('button[type="submit"]');
+      if(submitBtn){submitBtn.disabled=true;submitBtn.textContent='正在生成 AI 方案…';}
+      try{item.aiPlan={hobby:name,text:await requestPlan(name)};}
+      catch(_){item.aiPlan=null;/* 生成失败不阻塞保存，可在详情里重新生成 */}
     }
+    if(old)state.interests[state.interests.indexOf(old)]=item;else state.interests.push(item);
+    saveState();closeDialog();render();
+    if(old)toast('兴趣已更新。新的投入会用于下次排程。');
+    else if(item.aiPlan)toast('兴趣已记下，AI 方案已随兴趣保存，可在详情里采纳进周计划。');
+    else toast('兴趣已记下；AI 方案这次没有生成成功，可在详情里重新生成。');
   }
   // 兴趣详情里生成：成功后写进兴趣的 aiPlan 并重开详情展示。
   async function generateForInterest(id){
@@ -2169,8 +2163,8 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
 
   // 4. DIALOGS AND ACTIONS — Each action changes state in one place.
   function openInterest(id){
-    const a=id?interest(id):null;dialogInterestId=id||null;dialogAiPlan=null;
-    openDialog(a?'编辑兴趣':'记下一个想做的事',`<form id="interestForm"><div class="dialog-body"><div class="field"><label for="interestName">兴趣名称</label><input id="interestName" name="name" placeholder="例如：学吉他、练摄影、读一本书" maxlength="60" value="${e(a?activityName(a):'')}" required autofocus></div><div class="field"><label for="interestCategory">类别</label><select id="interestCategory" name="category" required><option value="" disabled ${a?'':'selected'}>请选择类别</option>${InterestClassifier.categories().map(c=>`<option value="${c.key}" ${a?.domain===c.key?'selected':''}>${c.label}</option>`).join('')}</select></div><p id="categoryNote" class="category-note">${a?'可以手动调整类别':'输入名称后会建议类别，你也可以自己选择。'}</p><div class="field"><label for="interestGoal">想做成什么样</label><textarea id="interestGoal" name="goal" maxlength="180" placeholder="把目标写小一点，更容易开始。">${e(a?.goal||'')}</textarea></div><div class="field"><label for="interestHours">每周预计投入</label><select id="interestHours" name="hours">${[.5,1,1.5,2,3,4].map(h=>`<option value="${h}" ${(a?.hours||1)===h?'selected':''}>${h} 小时</option>`).join('')}</select></div><label class="checkbox-field"><input type="checkbox" name="active" ${a?.active?'checked':''}>加入下次生成的周计划</label><div class="field"><label>AI 细化方案（可选）</label><p class="note" style="margin:0 0 10px">按兴趣名称生成周一到周日的具体安排；保存后可在兴趣详情里采纳，自动放进周计划。</p><button type="button" class="btn" data-action="ai-form-generate">${a?.aiPlan?'重新生成方案':'生成 AI 方案'}</button><p class="ai-error" id="interestAiError" role="alert" hidden></p><div class="ai-out" id="interestAiOut" ${a?.aiPlan?'':'hidden'}>${a?.aiPlan?planMarkup(a.aiPlan.text):''}</div></div><p id="interestError" role="alert" class="field-error" hidden></p></div><div class="dialog-footer">${button('close-dialog','取消')}<button type="submit" class="btn primary">${a?'保存修改':'存进兴趣池'}</button></div></form>`);
+    const a=id?interest(id):null;dialogInterestId=id||null;
+    openDialog(a?'编辑兴趣':'记下一个想做的事',`<form id="interestForm"><div class="dialog-body"><div class="field"><label for="interestName">兴趣名称</label><input id="interestName" name="name" placeholder="例如：学吉他、练摄影、读一本书" maxlength="60" value="${e(a?activityName(a):'')}" required autofocus></div><div class="field"><label for="interestCategory">类别</label><select id="interestCategory" name="category" required><option value="" disabled ${a?'':'selected'}>请选择类别</option>${InterestClassifier.categories().map(c=>`<option value="${c.key}" ${a?.domain===c.key?'selected':''}>${c.label}</option>`).join('')}</select></div><p id="categoryNote" class="category-note">${a?'可以手动调整类别':'输入名称后会建议类别，你也可以自己选择。'}</p><div class="field"><label for="interestGoal">想做成什么样</label><textarea id="interestGoal" name="goal" maxlength="180" placeholder="把目标写小一点，更容易开始。">${e(a?.goal||'')}</textarea></div><div class="field"><label for="interestHours">每周预计投入</label><select id="interestHours" name="hours">${[.5,1,1.5,2,3,4].map(h=>`<option value="${h}" ${(a?.hours||1)===h?'selected':''}>${h} 小时</option>`).join('')}</select></div><label class="checkbox-field"><input type="checkbox" name="active" ${a?.active?'checked':''}>加入下次生成的周计划</label><p class="note" style="margin:0">保存时会自动为这个兴趣生成一份 AI 细化周方案，无需手动选择。</p><p id="interestError" role="alert" class="field-error" hidden></p></div><div class="dialog-footer">${button('close-dialog','取消')}<button type="submit" class="btn primary">${a?'保存修改':'存进兴趣池'}</button></div></form>`);
   }
   function showInterest(id){
     const a=interest(id);if(!a)return;
@@ -2259,7 +2253,7 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
       'confirm-delete-entry':()=>{state.sessions=state.sessions.filter(s=>!(s.id===id&&isCustom(s)));saveState();closeDialog();render();toast('已删除这条日程。');},
       'close-dialog':closeDialog,'about':showAbout,'settings':()=>{document.getElementById('mobileNav').close();showSettings();},
       'logout':logout,'admin-refresh':()=>loadAdminLogs(true),
-      'ai-form-generate':()=>generateForInterestForm(),'ai-detail-generate':()=>generateForInterest(id),'ai-adopt':()=>adoptAiPlan(id),
+      'ai-detail-generate':()=>generateForInterest(id),'ai-adopt':()=>adoptAiPlan(id),
       'menu':()=>document.getElementById('mobileNav').showModal(),'close-menu':()=>document.getElementById('mobileNav').close(),
       'dismiss-toast':()=>document.getElementById('toast').hidden=true,
       'toggle-active':()=>{const a=interest(id);a.active=!a.active;saveState();closeDialog();render();toast(a.active?'会在下次生成周计划时安排这个兴趣。':'已先存起来，已有安排会继续保留。');},
@@ -2294,17 +2288,7 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
       Object.assign(state.person,{weeklyHours:Number(data.get('weeklyHours')),block:Number(data.get('block')),peakTime:data.get('peakTime'),recovery:Number(data.get('recovery'))});
       saveState();renderPace();document.getElementById('paceMessage').textContent='已保存，已有安排保留。';toast('节奏已更新。重新生成周计划可应用新的安排偏好。');
     }
-    if(form.id==='interestForm'){
-      const name=data.get('name').trim(),domain=data.get('category');
-      if(!name){showError('interestError','先给这个兴趣起个名字。');return;}
-      if(state.interests.some(a=>a.id!==dialogInterestId&&activityName(a).toLowerCase()===name.toLowerCase())){showError('interestError','这个兴趣已经记下了，可以直接编辑原来的条目。');return;}
-      const axes=InterestClassifier.axesOf(domain),old=dialogInterestId?interest(dialogInterestId):null;
-      if(!axes){showError('interestError','请先选一个合适的类别。');return;}
-      const item={...axes,id:old?.id||'interest-'+Date.now().toString(36),name,short:name,domain,categoryLabel:InterestClassifier.byKey(domain).label,goal:data.get('goal').trim()||'先完成一份小练习，再慢慢调整。',hours:Number(data.get('hours')),active:data.has('active'),mark:old?.mark||name.slice(0,2),aiPlan:dialogAiPlan?{hobby:name,text:dialogAiPlan.text}:(old?.aiPlan||null),cards:old?.cards||[{step:1,action:'选一个能在一段时间内完成的小练习',deliverable:'一份初步练习记录',tip:'只选一个小目标。'},{step:2,action:'根据第一次的记录再试一次',deliverable:'一份改进后的练习',tip:'记下一处进步就够了。'}]};
-      if(old)state.interests[state.interests.indexOf(old)]=item;else state.interests.push(item);
-      dialogAiPlan=null;
-      saveState();closeDialog();render();toast(old?'兴趣已更新。新的投入会用于下次排程。':'兴趣已记下，可以在周计划中安排它。');
-    }
+    if(form.id==='interestForm'){saveInterest(form,data);return;}
     if(form.id==='moveForm'){
       const s=state.sessions.find(s=>s.id===form.dataset.session);const date=data.get('date'),start=data.get('start'),min=Number(data.get('duration'));
       if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!Number.isInteger(min)||min<15||min>90){showError('moveError','请填写有效时间和 15–90 分钟的时长。');return;}
