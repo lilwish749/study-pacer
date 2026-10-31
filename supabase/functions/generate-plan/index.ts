@@ -3,12 +3,12 @@
 // 密钥只从服务端环境变量读取，绝不下发到前端。
 
 const DASHSCOPE_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-// 优先用通义新版模型，依次回退到更旧的可用模型，提高开通/额度容错。
+// 优先用通义 qwen3.8-flash；若账号未开通该模型，依次回退到当前账号已开通的百炼模型。
 const MODELS = (Deno.env.get('DASHSCOPE_MODEL') || 'qwen3.8-flash')
   .split(',')
   .map(m => m.trim())
   .filter(Boolean)
-  .concat(['qwen-flash', 'qwen-turbo']);
+  .concat(['glm-5.3', 'kimi-k3', 'MiniMax-M2.5', 'qwen-turbo']);
 // 去重保持顺序
 const MODEL_LIST = MODELS.filter((m, i) => MODELS.indexOf(m) === i);
 
