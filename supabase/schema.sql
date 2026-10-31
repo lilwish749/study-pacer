@@ -148,7 +148,40 @@ create trigger trg_force_log_username
   for each row execute function public.force_log_username();
 
 -- ============================================================
--- 5) 设置管理员（把用户名替换成你的管理员账号后单独执行一次）
+-- 5) 用户学习数据（跨设备同步）
+-- 每个账号一行，整份应用状态存放在 data 里，登录后自动拉取/回写。
+-- ============================================================
+create table if not exists public.user_states (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  data jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_states enable row level security;
+
+drop policy if exists "user_states read own" on public.user_states;
+create policy "user_states read own"
+  on public.user_states for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "user_states insert own" on public.user_states;
+create policy "user_states insert own"
+  on public.user_states for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "user_states update own" on public.user_states;
+create policy "user_states update own"
+  on public.user_states for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+grant select, insert, update on public.user_states to authenticated;
+
+-- ============================================================
+-- 6) 设置管理员（把用户名替换成你的管理员账号后单独执行一次）
 -- ============================================================
 -- update public.profiles set is_admin = true where username = '你的管理员用户名';
 

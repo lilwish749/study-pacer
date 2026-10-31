@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<meta name="description" content="学习配速器界面预览。单文件，离线使用，示例数据。">
+<meta name="description" content="学习配速器：记录兴趣、生成学习计划，并按节奏安排每天的时间。登录后数据同步到云端，可在不同设备继续。">
 <title>学习配速器 · 界面预览</title>
 <style>
 /* 01 THEME — Edit these values to change the whole interface. */
@@ -265,7 +265,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   <a class="brand" href="#today"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>学习配速器<small>STUDY PACER</small></span></a>
   <span class="nav-caption">你的学习空间</span><nav class="nav" id="desktopNav"></nav>
   <div class="sidebar-note"><strong>一次只专注一件事</strong><p>把想做的事收好<br>再为它留一点时间</p></div>
-  <div class="sidebar-bottom"><button class="text-btn" data-action="about">关于这个预览 <span aria-hidden="true">↗</span></button><br><button class="text-btn" data-action="settings">设置与备份</button><br><button class="text-btn" id="logoutBtn" data-action="logout" hidden>退出登录</button><div class="local-user"><span class="avatar" id="userAvatar" aria-hidden="true">P</span><div><span id="userName">我的学习空间</span><small id="saveStatus">示例数据 · 保存在本机</small></div></div></div>
+  <div class="sidebar-bottom"><button class="text-btn" data-action="about">关于这个预览 <span aria-hidden="true">↗</span></button><br><button class="text-btn" data-action="settings">设置与备份</button><br><button class="text-btn" id="logoutBtn" data-action="logout" hidden>退出登录</button><div class="local-user"><span class="avatar" id="userAvatar" aria-hidden="true">P</span><div><span id="userName">我的学习空间</span><small id="saveStatus">登录后同步到云端</small></div></div></div>
  </aside>
  <div class="workspace"><header class="topbar"><button class="icon-btn mobile-menu" data-action="menu" aria-label="打开导航">☰</button><div class="crumb">我的空间 <span aria-hidden="true">/</span><span id="breadcrumb">今日</span></div><div class="spacer"></div><span class="date-label small muted" id="topbarDate">2026 年 10 月</span><span class="preview-badge">PREVIEW 01</span><button class="icon-btn" data-action="about" aria-label="查看预览说明">?</button></header><main id="main" class="content" tabindex="-1"></main></div>
 </div>
@@ -1605,6 +1605,9 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   const AUTH_DOMAIN = 'study-pacer.local';
   let authClient = null, currentUser = null, currentProfile = null, isAdmin = false;
   let authMode = 'login', authBusy = false, adminLogs = null;
+  // CLOUD SYNC — 登录后整份学习数据同步到 Supabase，换设备登录即可继续。
+  const OWNER_KEY = 'study-pacer.owner.v1';
+  let syncReady = false, syncingCloud = false, cloudOk = false, cloudError = '', cloudTimer = null, pendingCloud = false, cloudNoticeShown = false;
   // AI — 新兴趣保存时自动生成方案并存在 aiPlan 字段（随本地存储持久化）；采纳进周计划时只用 AI 方案。
   let aiBusy = false;
   function navItems(){return isAdmin ? NAV.concat(ADMIN_NAV) : NAV;}
@@ -1947,12 +1950,106 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     saved.person=p;
     return saved;
   }
+  function writeLocalState(){
+    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));storageAvailable=true;return true;}
+    catch{storageAvailable=false;toast('本机存储暂不可用，本次修改只在当前窗口保留。');return false;}
+  }
   function saveState(){
-    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));storageAvailable=true;}
-    catch{storageAvailable=false;toast('本机存储暂不可用，本次修改只在当前窗口保留。');}
+    state.updatedAt=new Date().toISOString();
+    writeLocalState();
+    updateSaveStatus();
+    queueCloudSave();
+  }
+  function updateSaveStatus(){
+    const node=document.getElementById('saveStatus');if(!node)return;
+    if(!storageAvailable){node.textContent='本次修改 · 仅当前窗口';return;}
+    if(!currentUser){node.textContent='数据保存在本机';return;}
+    if(syncingCloud){node.textContent='正在同步到云端…';return;}
+    if(!syncReady){node.textContent='正在连接云端…';return;}
+    node.textContent=cloudOk?'已同步到云端':'云端暂不可用 · 已存本机';
+  }
+  function queueCloudSave(){
+    if(!currentUser||!syncReady)return;
+    pendingCloud=true;
+    clearTimeout(cloudTimer);
+    cloudTimer=setTimeout(()=>{cloudTimer=null;pushCloudNow();},800);
+  }
+  async function pushCloudNow(){
+    if(!currentUser||!authClient)return;
+    if(syncingCloud){pendingCloud=true;return;}
+    syncingCloud=true;pendingCloud=false;updateSaveStatus();
+    try{
+      const {error}=await authClient.from('user_states').upsert({user_id:currentUser.id,data:state,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+      if(error)throw error;
+      cloudOk=true;cloudError='';localStorage.setItem(OWNER_KEY,currentUser.id);
+    }catch(error){
+      cloudOk=false;cloudError=String((error&&error.message)||error);console.warn('cloud sync save failed',error);
+      if(!cloudNoticeShown){
+        cloudNoticeShown=true;
+        if(/does not exist|schema|relation/i.test(cloudError))toast('云端同步表还没创建，数据暂时只保存在这台设备。');
+      }
+    }finally{
+      syncingCloud=false;updateSaveStatus();
+      if(pendingCloud){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{cloudTimer=null;pushCloudNow();},400);}
+    }
+  }
+  async function hydrateCloud(){
+    syncReady=false;cloudOk=false;cloudError='';pendingCloud=false;
+    if(!authClient||!currentUser){syncReady=true;updateSaveStatus();return;}
+    const uid=currentUser.id;
+    try{
+      const {data,error}=await authClient.from('user_states').select('data,updated_at').eq('user_id',uid).maybeSingle();
+      if(error)throw error;
+      cloudOk=true;
+      const owner=localStorage.getItem(OWNER_KEY);
+      if(data&&data.data&&data.data.version===1){
+        const localStamp=Date.parse(state.updatedAt||'')||0;
+        const cloudStamp=Date.parse((data.data&&data.data.updatedAt)||data.updated_at||'')||0;
+        // 换了账号，或云端比本机新：以云端为准；否则把本机较新的数据推上去。
+        if(owner!==uid||cloudStamp>localStamp){
+          state=migrateState(data.data);
+          writeLocalState();
+        }else if(localStamp>=cloudStamp){
+          await pushCloudNow();
+        }
+      }else{
+        if(owner&&owner!==uid)state=initialState();
+        state.updatedAt=new Date().toISOString();
+        writeLocalState();
+        await pushCloudNow();
+      }
+      localStorage.setItem(OWNER_KEY,uid);
+      syncReady=true;
+    }catch(error){
+      syncReady=true;cloudOk=false;cloudError=String((error&&error.message)||error);
+      console.warn('cloud sync load failed',error);
+      if(/does not exist|schema|relation/i.test(cloudError))toast('云端同步表还没创建，数据暂时只保存在这台设备。');
+    }
     updateSaveStatus();
   }
-  function updateSaveStatus(){document.getElementById('saveStatus').textContent=storageAvailable?'示例数据 · 保存在本机':'本次修改 · 仅当前窗口';}
+  // 回到页面时看看其他设备有没有更新：本机没有待上传改动时拉取云端较新版本。
+  async function refreshCloud(){
+    if(!currentUser||!authClient||!syncReady||syncingCloud||pendingCloud||modal.open)return;
+    try{
+      const {data,error}=await authClient.from('user_states').select('data,updated_at').eq('user_id',currentUser.id).maybeSingle();
+      if(error||!data||!data.data)return;
+      const localStamp=Date.parse(state.updatedAt||'')||0;
+      const cloudStamp=Date.parse(data.data.updatedAt||data.updated_at||'')||0;
+      if(cloudStamp>localStamp){
+        state=migrateState(data.data);writeLocalState();cloudOk=true;updateSaveStatus();route();
+        toast('已同步其他设备上的最新改动。');
+      }else if(localStamp>cloudStamp){
+        await pushCloudNow();
+      }
+    }catch(error){console.warn('cloud refresh failed',error);}
+  }
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='hidden'&&currentUser&&syncReady&&pendingCloud){
+      clearTimeout(cloudTimer);cloudTimer=null;pushCloudNow();
+    }
+    if(document.visibilityState==='visible')refreshCloud();
+  });
+  window.addEventListener('focus',()=>{if(document.visibilityState==='visible')refreshCloud();});
   function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   const e=escapeHtml;
   function icon(name){return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]||ICONS.arrow}</svg>`;}
@@ -2119,7 +2216,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
         <p id="authNotice" class="note" role="status" ${notice?'':'hidden'}>${e(notice)}</p>
         <button class="btn primary auth-submit" id="authSubmit" type="submit">${authMode==='signup'?'注册并进入':'登录'}</button>
       </form>
-      <p class="auth-foot">登录状态由 Supabase 管理；学习计划数据仍保存在这台设备上。</p>`}
+      <p class="auth-foot">登录状态与学习数据都由 Supabase 云端保存，换设备登录同一账号即可同步全部安排。</p>`}
     </div>`;
   }
   function showAuthGate(notice=''){
@@ -2175,13 +2272,13 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     }
     const profile=await ensureProfile(user,username);
     await logLogin(user,profile.username);
-    enterApp(user,profile,'注册成功，先安排今天的一件小事吧。');
+    await enterApp(user,profile,'注册成功，先安排今天的一件小事吧。');
   }
   async function signIn(username,password){
     const {data,error}=await authClient.auth.signInWithPassword({email:authEmail(username),password});
     if(error)throw new Error(friendlyAuthError(error));
     const user=data.user,profile=await ensureProfile(user,username);
-    enterApp(user,profile);
+    await enterApp(user,profile);
     const logged=await logLogin(user,profile.username);
     toast(logged?'已登录，欢迎回来。':'已登录，但登录日志写入失败，请确认已执行 schema.sql。');
   }
@@ -2213,15 +2310,18 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
       if(mobileLogout)mobileLogout.hidden=true;
     }
   }
-  function enterApp(user,profile,message){
+  async function enterApp(user,profile,message){
     currentUser=user;currentProfile=profile;isAdmin=!!profile.is_admin;adminLogs=null;
     paintUser();hideAuthGate();
     if(location.hash==='#admin'&&!isAdmin)history.replaceState(null,'',location.pathname+location.search);
+    if(main)main.innerHTML='<p class="ai-loading" style="padding:40px 0">正在同步你的云端数据…</p>';
+    await hydrateCloud();
     route();
     if(message)toast(message);
   }
   async function logout(){
     if(authClient){try{await authClient.auth.signOut();}catch(err){console.warn(err);}}
+    syncReady=false;cloudOk=false;pendingCloud=false;clearTimeout(cloudTimer);cloudTimer=null;
     currentUser=null;currentProfile=null;isAdmin=false;adminLogs=null;page='today';
     if(location.hash)history.replaceState(null,'',location.pathname+location.search);
     paintUser();showAuthGate('已退出登录。');
@@ -2233,7 +2333,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
       const {data}=await authClient.auth.getSession();
       if(data.session){
         const profile=await ensureProfile(data.session.user);
-        enterApp(data.session.user,profile);
+        await enterApp(data.session.user,profile);
         return;
       }
     }catch(err){console.warn(err);}
