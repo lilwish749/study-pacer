@@ -2015,7 +2015,7 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
   function renderInterests(){
     main.innerHTML=pageHead('让兴趣有个去处','先收好想做的事，再决定什么时候开始。',button('add-interest','记录新兴趣',{primary:true,icon:'plus'}))+`
       <div class="interest-flow"><b>01 记录兴趣</b><span aria-hidden="true">→</span><span>02 选择每周投入</span><span aria-hidden="true">→</span><span>03 生成周计划</span></div>
-      <div class="toolbar"><div class="segmented" aria-label="兴趣筛选">${[['all','全部兴趣'],['active','已加入计划'],['saved','先存起来']].map(([id,label])=>`<button data-filter="${id}" aria-pressed="${interestFilter===id}">${label}</button>`).join('')}</div><label class="search">${icon('search')}<input type="search" id="interestSearch" placeholder="找一个兴趣" aria-label="搜索兴趣" value="${e(query)}"></label></div><div id="interestRows" class="interest-list"></div><p class="note interest-footer">不用同时开始所有兴趣。先存起来，想做的时候再加入计划。</p>`;
+      <div class="toolbar"><div class="segmented" aria-label="兴趣筛选">${[['all','先存起来'],['active','已加入计划']].map(([id,label])=>`<button data-filter="${id}" aria-pressed="${interestFilter===id}">${label}</button>`).join('')}</div><label class="search">${icon('search')}<input type="search" id="interestSearch" placeholder="找一个兴趣" aria-label="搜索兴趣" value="${e(query)}"></label></div><div id="interestRows" class="interest-list"></div><p class="note interest-footer">不用同时开始所有兴趣。先存起来，想做的时候再加入计划。</p>`;
     renderInterestRows();
   }
   function renderInterestRows(){
