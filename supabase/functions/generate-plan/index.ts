@@ -53,11 +53,12 @@ function systemPrompt(hobby: string, goal: string, hours: string): string {
 （按此格式继续，直至覆盖到总周期）
 
 【第二部分：本周细化】
-紧接着输出分隔行【本周细化】，然后给出周一到周日的具体安排。每一天必须包含以下四项，缺一不可：
+紧接着输出分隔行【本周细化】，然后给出周一到周日的具体安排。每一天必须包含以下五项，缺一不可：
 - 活动：写清楚做什么，不少于 20 字，必须包含可执行的动作（如“练习XX的第X小节，重复N遍”）
 - 时长：X分钟
 - 材料/条件：列出具体物品或前提
 - 完成标准：怎样算完成了这一天的任务
+- 推荐参考：给出 2–3 个与当天活动直接相关的网站、App 或学习方法，用中文顿号“、”分隔；能给出公开网址时在名称后附完整链接（例如“JustinGuitar 官网 https://www.justinguitar.com”），不要使用 Markdown 链接格式。优先选择可长期访问的公开资源，不要编造不存在的网址。
 
 详细程度参考以下好例子，避免坏例子那种笼统表述。
 
@@ -70,6 +71,9 @@ function systemPrompt(hobby: string, goal: string, hours: string): string {
 - 时长：25 分钟
 - 材料/条件：吉他、节拍器 App、音阶谱
 - 完成标准：右手和左手各完成 10 遍，且节拍器无错拍
+- 推荐参考：JustinGuitar 官网 https://www.justinguitar.com、B站「吉他音阶入门」系列课、Fender Play App
+
+每天推荐的学习方法可以按当天任务类型变化（例如跟练、拆段练习、回顾测验），避免七天全部重复同一条资源。
 
 现在请为「${hobby}」规划完整学习周期。
 用户目标：${goal}
@@ -94,7 +98,7 @@ async function callDashScope(apiKey: string, hobby: string, goal: string, hours:
           { role: 'user', content: `爱好：${hobby}\n目标：${goal}\n每周可投入：${hours} 小时` },
         ],
         temperature: 0.6,
-        max_tokens: 2800,
+        max_tokens: 3200,
       }),
     });
 

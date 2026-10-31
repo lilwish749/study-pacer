@@ -218,6 +218,15 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
 .load-preview-inner b{font-weight:500}
 .load-preview-inner .load-steps{margin-left:auto}
 
+/* 每日「推荐参考」标签 */
+.ai-ref{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin:8px 0 6px}
+.ai-ref b{flex:none}
+.ref-chips{display:inline-flex;flex-wrap:wrap;gap:6px;min-width:0}
+.ref-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border:1px solid #3a3646;border-radius:999px;background:#14131a;color:#c9c3dc;font-size:11px;line-height:1.65;max-width:100%;overflow-wrap:anywhere}
+.ref-link{color:var(--accent);border-color:rgb(184 166 248 / 38%);transition:background-color .18s var(--ease),transform .18s var(--ease),border-color .18s var(--ease)}
+.ref-link:hover{background:rgb(184 166 248 / 12%);transform:translateY(-1px)}
+.ref-link span{opacity:.7;font-size:10px}
+
 /* 动效 */
 .content.page-in{animation:pageIn .42s var(--ease)}
 @keyframes pageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
@@ -2365,12 +2374,28 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     const detail=s.done?'✓ 已完成':`${duration(s)} 分钟${custom?` · ${e(kindLabel(s))}`:''}${li?` · ${li.label} ${li.score} 分`:''}`;
     return `<article class="week-block ${s.done?'done':''} ${custom?'custom':''}" style="--load-color:${li?li.color:'#807499'}" data-action="session-detail" data-id="${e(s.id)}" title="点击查看计划细则"><span class="block-time">${s.start} – ${s.end}</span><h3>${e(sessionTitle(s))}</h3><p>${detail}</p><button class="text-btn" data-action="${custom?'edit-entry':'move-session'}" data-id="${e(s.id)}">${custom?'编辑安排':'调整时间'} ${icon('edit')}</button></article>`;
   }
-  // 计划细则：把 AI 方案里当天的四项内容渲染成对话框正文。
+  // 推荐参考：把「网站/App/方法」拆成小标签，识别到公开网址时变成可点击链接。
+  function refChips(text){
+    return String(text).split(/[、，,；;／]/).map(s=>s.trim()).filter(Boolean).map(item=>{
+      const url=item.match(/https?:\/\/[^\s，。；、）)】]+/i);
+      if(url){
+        const href=url[0].replace(/[.,;:]+$/,'');
+        return `<a class="ref-chip ref-link" href="${e(href)}" target="_blank" rel="noopener noreferrer">${e(item)}<span aria-hidden="true">↗</span></a>`;
+      }
+      return `<span class="ref-chip">${e(item)}</span>`;
+    }).join('');
+  }
+  function planRefMarkup(text){
+    return `<div class="ai-ref"><b class="detail-key">推荐参考</b><span class="ref-chips">${refChips(text)}</span></div>`;
+  }
+  // 计划细则：把 AI 方案里当天的内容渲染成对话框正文。
   function planDetailMarkup(text){
     return String(text).split(/\r?\n/).filter(line=>line.trim()).map(line=>{
       const t=line.trim();
-      const m=t.match(/^(活动|时长|材料\/条件|材料|完成标准)[：:]\s*(.*)$/);
-      return m?`<p class="ai-line"><b class="detail-key">${e(m[1])}</b>：${e(m[2])}</p>`:`<p class="ai-line">${e(t)}</p>`;
+      const m=t.match(/^(推荐参考|推荐资源|参考推荐|活动|时长|材料\/条件|材料|完成标准)[：:]\s*(.*)$/);
+      if(!m)return `<p class="ai-line">${e(t)}</p>`;
+      if(/推荐/.test(m[1]))return planRefMarkup(m[2]);
+      return `<p class="ai-line"><b class="detail-key">${e(m[1])}</b>：${e(m[2])}</p>`;
     }).join('');
   }
   function showSessionDetail(s){
@@ -2392,6 +2417,8 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
       if(/^周[一二三四五六日]/.test(t)&&t.length<=6)return `<h3 class="ai-day">${e(t)}</h3>`;
       // 去掉百炼输出里的 Markdown 项目符号，让内容更整洁。
       t=t.replace(/^[-*•]\s*/,'');
+      const ref=t.match(/^(推荐参考|推荐资源|参考推荐)[：:]\s*(.*)$/);
+      if(ref)return planRefMarkup(ref[2]);
       return `<p class="ai-line">${e(t)}</p>`;
     }).join('');
   }
