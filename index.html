@@ -2015,6 +2015,7 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
   function renderInterests(){
     main.innerHTML=pageHead('让兴趣有个去处','先收好想做的事，再决定什么时候开始。',button('add-interest','记录新兴趣',{primary:true,icon:'plus'}))+`
       <div class="interest-flow"><b>01 记录兴趣</b><span aria-hidden="true">→</span><span>02 选择每周投入</span><span aria-hidden="true">→</span><span>03 生成周计划</span></div>
+      ${aiSectionMarkup()}
       <div class="toolbar"><div class="segmented" aria-label="兴趣筛选">${[['all','全部兴趣'],['active','已加入计划'],['saved','先存起来']].map(([id,label])=>`<button data-filter="${id}" aria-pressed="${interestFilter===id}">${label}</button>`).join('')}</div><label class="search">${icon('search')}<input type="search" id="interestSearch" placeholder="找一个兴趣" aria-label="搜索兴趣" value="${e(query)}"></label></div><div id="interestRows" class="interest-list"></div><p class="note interest-footer">不用同时开始所有兴趣。先存起来，想做的时候再加入计划。</p>`;
     renderInterestRows();
   }
@@ -2026,7 +2027,6 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
     main.innerHTML=pageHead('给这一周一点方向','10 月 26 日 – 11 月 1 日 · 示例周计划',button('export-calendar','导出日历',{icon:'download'})+button('add-entry','添加日程',{icon:'plus'})+button('generate','生成周计划',{primary:true,icon:'plus'}))+`
     <div class="week-summary"><span><strong class="accent">${amount(totalMinutes())}</strong> 已安排</span><span><strong>${state.sessions.filter(s=>s.done).length} / ${state.sessions.length}</strong> 次已完成</span><span><span class="status-dot"></span>预计周负荷 <strong>${Math.round(weekLoad())}%</strong> · ${loadTone()}</span></div>
     <div class="toolbar"><div class="segmented" aria-label="计划视图"><button data-week-view="week" aria-pressed="${weekView==='week'}">周视图</button><button data-week-view="list" aria-pressed="${weekView==='list'}">每日列表</button></div><span class="note">${weekView==='week'?'每格按时间顺序排列':'选一天，只看这一天的安排'}</span></div>
-    ${aiSectionMarkup()}
     ${weekView==='week'?`<section class="week-grid" aria-label="七天计划">${DAY_NAMES.map((d,i)=>`<div class="day-column ${dateAt(i)===TODAY?'today':''}"><div class="day-heading"><span>${d}</span><strong>${Number(dateAt(i).slice(8))}</strong></div><div class="day-items">${sessionList(dateAt(i)).map(weekBlock).join('')||`<p class="day-rest">${i===6?'给自己留白<br>今天休息':'还没有安排<br>可以慢慢来'}</p>`}</div></div>`).join('')}</section>`:`<div class="day-picker" aria-label="选择日期">${DAY_NAMES.map((d,i)=>`<button data-day="${dateAt(i)}" aria-pressed="${selectedDay===dateAt(i)}">${d}<span>${Number(dateAt(i).slice(8))}</span></button>`).join('')}</div><h2 class="agenda-heading">${dateLabel(selectedDay)} · ${DAY_NAMES[dayIndex(selectedDay)]}</h2>${sessionList(selectedDay).length?sessionList(selectedDay).map(taskRow).join(''):'<div class="empty"><h3>这一天还没有安排</h3><p>可以休息，也可以在生成计划时调整可用时间。</p></div>'}`}
     <p class="note" style="margin-top:22px">先调整「我的节奏」，再生成适合自己的安排。自动安排会留出休息间隔，并列出没有放下的练习。课程、上班等固定安排可以用「添加日程」直接放进来。</p>`;
   }
