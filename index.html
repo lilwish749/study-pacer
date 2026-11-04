@@ -228,15 +228,15 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
 .ref-link:hover{background:rgb(184 166 248 / 12%);transform:translateY(-1px)}
 .ref-link span{opacity:.7;font-size:10px}
 
-/* 负荷标尺：收进胶囊，文字用中性色，只让五档条带承担色彩 */
-.load-gauge{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;width:fit-content;padding:5px 11px;border:1px solid #2b2930;border-radius:999px;background:#111015}
+/* 负荷标尺：一条细线进度，颜色只出现在线上，与页面其它进度条同一语言 */
+.load-gauge{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;width:fit-content}
 .load-gauge .gauge-label{font-size:11.5px;font-weight:500;color:#d8d3e4;letter-spacing:.01em}
+.load-gauge .load-meter{position:relative;width:64px;height:3px;border-radius:2px;background:#2a2733;overflow:hidden}
+.load-gauge .load-meter i{display:block;height:100%;width:var(--load-fill);border-radius:2px;background:var(--load-color);opacity:.85;transition:width .32s var(--ease)}
 .load-gauge small{display:inline-flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);line-height:1.4}
 .load-gauge .gauge-score{color:#8f88a3;font-variant-numeric:tabular-nums}
 .load-gauge .gauge-src{color:var(--muted)}
 .load-gauge .gauge-src::before{content:"·";margin-right:6px;color:#4c475a}
-.load-gauge .load-steps i{width:10px;height:4px;border-radius:999px;background:#34313d;transform:none}
-.load-gauge .load-steps i.on{background:var(--load-color);opacity:.85;transform:none}
 
 /* 动效 */
 .content.page-in{animation:pageIn .42s var(--ease)}
@@ -2172,8 +2172,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     return {...gradeOfScore(s.score),top:LMS.topContributor(s.parts,LMS.weightsOf(state.person)),advice:adv[0],confidence:conf};
   }
   function loadGauge(info,compact){
-    const steps=[1,2,3,4,5].map(n=>`<i class="${n<=info.tier?'on':''}"></i>`).join('');
-    return `<div class="load-gauge" style="--load-color:${info.color}"><span class="gauge-label">${info.label}</span><div class="load-steps" role="img" aria-label="负荷五档中的第 ${info.tier} 档">${steps}</div><small><span class="gauge-score">${info.score} 分</span>${compact?'':`<span class="gauge-src">主要来自${info.top}</span>`}</small></div>`;
+    return `<div class="load-gauge" style="--load-color:${info.color};--load-fill:${info.tier*20}%"><span class="gauge-label">${info.label}</span><div class="load-meter" role="img" aria-label="负荷五档中的第 ${info.tier} 档"><i></i></div><small><span class="gauge-score">${info.score} 分</span>${compact?'':`<span class="gauge-src">主要来自${info.top}</span>`}</small></div>`;
   }
   function totalMinutes(){return state.sessions.reduce((n,s)=>n+duration(s),0);}
   function weekLoad(){
