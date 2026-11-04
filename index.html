@@ -19,14 +19,17 @@
 /* 07 PACE / 完整问卷与负荷五档 */
 .pace-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(250px,1fr);gap:38px}
 .profile-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.profile-card{border:1px solid var(--line);padding:18px}
-.pcard-label{font-size:10px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
-.pcard-big{display:block;font-size:26px;font-weight:550;letter-spacing:-.03em;margin:8px 0 6px;line-height:1.3}
+.profile-card{border:1px solid var(--line);border-radius:14px;padding:16px 17px;background:#121117}
+.pcard-label{font-size:10px;color:var(--muted);letter-spacing:.1em}
+.pcard-value{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:9px 0 7px}
+.pcard-dot{width:6px;height:6px;border-radius:50%;flex:none;opacity:.9}
+.pcard-big{display:inline-block;font-size:20px;font-weight:500;letter-spacing:-.01em;margin:0;line-height:1.3}
+.pcard-tier{font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 7px;line-height:1.7}
 .pcard-note{font-size:12px;color:var(--muted);line-height:1.8}
 .channel-bars{display:grid;gap:8px;margin-top:10px}
 .channel-bar{display:grid;grid-template-columns:68px minmax(0,1fr) 34px;gap:8px;align-items:center;font-size:11px;color:var(--muted)}
-.channel-bar em{display:block;height:5px;background:#28262d}
-.channel-bar em i{display:block;height:100%;background:var(--accent)}
+.channel-bar em{display:block;height:4px;background:#28262d}
+.channel-bar em i{display:block;height:100%;background:var(--accent);opacity:.85}
 .load-board{display:grid;border-top:1px solid var(--line)}
 .load-row{padding:16px 0;border-bottom:1px solid var(--line);display:grid;gap:8px}
 .load-row-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -2855,8 +2858,8 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     openDialog('你的学习画像',`<div class="dialog-body">
       <p class="quiz-hint">用大白话总结你的学习特点。之后每次重新填写和完成反馈，都会让它更准。</p>
       <div class="profile-cards">
-        <div class="profile-card"><span class="pcard-label">你的吃力程度</span><b class="pcard-big" style="color:${fat.color}">${fat.label}<small style="font-size:11px;color:var(--muted);margin-left:8px">第 ${fat.tier}/5 档</small></b><p class="pcard-note">${FATIGUE_NOTE[fat.label]||''}</p></div>
-        <div class="profile-card"><span class="pcard-label">画像准确度</span><b class="pcard-big" style="color:${cf.color}">${cf.label}<small style="font-size:11px;color:var(--muted);margin-left:8px">第 ${cf.tier}/5 档</small></b><p class="pcard-note">答得越完整、反馈给得越多，画像就越准。</p></div>
+        <div class="profile-card"><span class="pcard-label">你的吃力程度</span><div class="pcard-value"><i class="pcard-dot" style="background:${fat.color}"></i><b class="pcard-big">${fat.label}</b><span class="pcard-tier">第 ${fat.tier} / 5 档</span></div><p class="pcard-note">${FATIGUE_NOTE[fat.label]||''}</p></div>
+        <div class="profile-card"><span class="pcard-label">画像准确度</span><div class="pcard-value"><i class="pcard-dot" style="background:${cf.color}"></i><b class="pcard-big">${cf.label}</b><span class="pcard-tier">第 ${cf.tier} / 5 档</span></div><p class="pcard-note">答得越完整、反馈给得越多，画像就越准。</p></div>
         <div class="profile-card"><span class="pcard-label">最适合你的学习方式</span><b class="pcard-big">${topChannel(p.channel)}</b><div class="channel-bars">${['read','audiovisual','hands','social'].map(k=>{const v=Math.round((p.channel[k]||0)*100);return `<div class="channel-bar"><span>${CHANNEL_LABELS[k]}</span><em><i style="width:${Math.min(100,v*2.5)}%"></i></em><span>${v}%</span></div>`;}).join('')}</div></div>
         <div class="profile-card"><span class="pcard-label">你的学习节奏</span><p class="pcard-note" style="margin-top:10px">· 一次专注 <b>${blockTxt}</b><br>· 最清醒的时段：<b>${TIME_LABELS[p.peakTime]||'早晨'}</b><br>· 每周可投入 <b>${hrsTxt}</b><br>· 睡眠休息：<b>${recTxt}</b></p></div>
       </div>
@@ -2943,8 +2946,8 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     <div class="pace-grid">
       <section>
         <div class="profile-cards">
-          <div class="profile-card"><span class="pcard-label">你的吃力程度</span><b class="pcard-big" style="color:${fat.color}">${fat.label}<small style="font-size:11px;color:var(--muted);margin-left:8px">第 ${fat.tier}/5 档</small></b><p class="pcard-note">${FATIGUE_NOTE[fat.label]||''}</p></div>
-          <div class="profile-card"><span class="pcard-label">画像准确度</span><b class="pcard-big" style="color:${cf.color}">${cf.label}<small style="font-size:11px;color:var(--muted);margin-left:8px">第 ${cf.tier}/5 档</small></b><p class="pcard-note">${conf<.5?'问卷还不完整，负荷只是按一般情况估算。':'答得越完整、反馈给得越多，画像就越准。'}</p></div>
+          <div class="profile-card"><span class="pcard-label">你的吃力程度</span><div class="pcard-value"><i class="pcard-dot" style="background:${fat.color}"></i><b class="pcard-big">${fat.label}</b><span class="pcard-tier">第 ${fat.tier} / 5 档</span></div><p class="pcard-note">${FATIGUE_NOTE[fat.label]||''}</p></div>
+          <div class="profile-card"><span class="pcard-label">画像准确度</span><div class="pcard-value"><i class="pcard-dot" style="background:${cf.color}"></i><b class="pcard-big">${cf.label}</b><span class="pcard-tier">第 ${cf.tier} / 5 档</span></div><p class="pcard-note">${conf<.5?'问卷还不完整，负荷只是按一般情况估算。':'答得越完整、反馈给得越多，画像就越准。'}</p></div>
           <div class="profile-card"><span class="pcard-label">最适合你的学习方式</span><b class="pcard-big">${topChannel(p.channel)}</b><div class="channel-bars">${['read','audiovisual','hands','social'].map(k=>{const v=Math.round((p.channel[k]||0)*100);return `<div class="channel-bar"><span>${CHANNEL_LABELS[k]}</span><em><i style="width:${Math.min(100,v*2.5)}%"></i></em><span>${v}%</span></div>`;}).join('')}</div></div>
           <div class="profile-card"><span class="pcard-label">你的学习节奏</span><p class="pcard-note" style="margin-top:10px">· 一次专注 <b>${blockTxt}</b><br>· 最清醒的时段：<b>${TIME_LABELS[p.peakTime]||'早晨'}</b><br>· 每周可投入 <b>${p.weeklyHours} 小时</b><br>· 睡眠休息：<b>${p.recovery>=.8?'规律充足':p.recovery>=.5?'一般':'经常熬夜'}</b></p></div>
         </div>
