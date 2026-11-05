@@ -96,12 +96,15 @@ class（课程/讲座/培训）、study（自学/作业/复习）、work（工�
 同时给出：
 - typeLabel：不超过 8 个字，优先取自名称里的核心词（如「高等数学课」→「数学课」），禁止用「未知」「其他」「安排」这类泛称
 - domainLabel：不超过 6 字的具体领域，如「数学」「语言」「编程」「运动」「职场」「生活」；无法判断时用「综合」
-- intensity：0–100，表示每小时的消耗强度，不要考虑时长。40 以下为轻量日常，40–70 为普通课程或工作，70–90 为高强度脑力/体力，90 以上为考试冲刺或重体力
+- effect：对当天负荷的作用，只能是 load（增加负荷，如学习、工作、运动）、neutral（不增不减的小任务，如打印、提交材料、洗澡、取快递、缴费）、rest（减少负荷的休息，如午睡、散步、打游戏放松、冥想、听歌发呆）
+- intensity：仅 effect=load 时给 0–100 的每小时消耗强度，其他情况填 0。40 以下为轻量日常，40–70 为普通课程或工作，70–90 为高强度脑力/体力，90 以上为考试冲刺或重体力
+- recovery：仅 effect=rest 时给 0–100 的每小时恢复力度，其他情况填 0
 - reason：不超过 24 字，说明最主要的判断依据
 - confidence：0–1，表示你对这次判断的把握
 
 只输出一个 JSON 对象，不要 Markdown，不要解释。字段必须齐全。
-示例：{"kind":"class","typeLabel":"数学课","domainLabel":"数学","intensity":72,"reason":"需要连续推导和高度专注","confidence":0.86}
+示例：{"kind":"class","typeLabel":"数学课","domainLabel":"数学","effect":"load","intensity":72,"recovery":0,"reason":"需要连续推导和高度专注","confidence":0.86}
+示例：{"kind":"rest","typeLabel":"午睡","domainLabel":"生活","effect":"rest","intensity":0,"recovery":60,"reason":"短时睡眠能恢复精力","confidence":0.9}
 
 用户节奏参考：${JSON.stringify(person)}`;
 }
@@ -125,11 +128,14 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
 
 function normalizeClassify(raw: Record<string, unknown>) {
   const kind = CLASSIFY_KINDS.includes(String(raw.kind)) ? String(raw.kind) : 'other';
+  const effect = ['load', 'neutral', 'rest'].includes(String(raw.effect)) ? String(raw.effect) : 'load';
   return {
     kind,
     typeLabel: String(raw.typeLabel || '').trim().slice(0, 8) || '自定义安排',
     domainLabel: String(raw.domainLabel || '').trim().slice(0, 6) || '生活',
-    intensity: Math.round(clampNumber(raw.intensity, 0, 100, 60)),
+    effect,
+    intensity: effect === 'load' ? Math.round(clampNumber(raw.intensity, 0, 100, 60)) : 0,
+    recovery: effect === 'rest' ? Math.round(clampNumber(raw.recovery, 0, 100, 55)) : 0,
     reason: String(raw.reason || '').trim().slice(0, 24) || '按活动性质综合判断',
     confidence: clampNumber(raw.confidence, 0, 1, 0.75),
   };
