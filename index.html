@@ -240,6 +240,9 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
 .load-gauge .gauge-score{color:#8f88a3;font-variant-numeric:tabular-nums}
 .load-gauge .gauge-src{color:var(--muted)}
 .load-gauge .gauge-src::before{content:"·";margin-right:6px;color:#4c475a}
+.pace-level{margin:10px 0 12px;display:flex;flex-direction:column;gap:3px}
+.pace-level b{font-size:30px;font-weight:500;letter-spacing:-.02em;line-height:1.15;color:var(--text)}
+.pace-level small{font-size:11px;color:var(--muted)}
 .ai-hint{margin:-2px 0 14px;font-size:11px;color:var(--muted);line-height:1.55}
 .ai-chip{display:inline-flex;align-items:center;margin-right:5px;padding:0 5px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);font-size:9px;letter-spacing:.04em;line-height:1.6}
 
@@ -2466,9 +2469,9 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
         <div class="next-bottom"><span class="next-time">${next?`${next.start} – ${next.end} · ${duration(next)} 分钟`:'留一点空白也很好'}</span>${next?button('focus','开始专注',{id:next.id,className:'dark',icon:'arrow'}):button('add-interest','记录兴趣',{className:'dark',icon:'plus'})}</div>
       </section>
       <section class="pace-summary" aria-label="本周节奏">
-        <p class="eyebrow">THIS WEEK / 本周节奏</p><p><span class="status-dot"></span><span class="small">${loadTone()}</span></p>
-        <div class="pace-number">${Math.round(load)}<small>% 预计周负荷</small></div><div class="progress" role="meter" aria-label="预计周负荷" aria-valuemin="0" aria-valuemax="150" aria-valuenow="${Math.round(load)}"><span style="width:${Math.min(100,load)}%"></span></div>
-        <div class="summary-detail"><span>今日负荷</span><strong style="color:${dl.level.color}">${Math.round(dl.percent)}% · ${dl.level.label}</strong></div><div class="summary-detail"><span>已经安排</span><strong>${amount(totalMinutes())}</strong></div><div class="summary-detail"><span>每周可用</span><strong>${state.person.weeklyHours} 小时</strong></div>
+        <p class="eyebrow">THIS WEEK / 本周节奏</p>
+        <div class="pace-level"><b>${loadTone()}</b><small>本周整体负荷</small></div><div class="progress" role="meter" aria-label="预计周负荷" aria-valuemin="0" aria-valuemax="150" aria-valuenow="${Math.round(load)}" aria-valuetext="${loadTone()}"><span style="width:${Math.min(100,load)}%"></span></div>
+        <div class="summary-detail"><span>今日负荷</span><strong style="color:${dl.level.color}">${dl.level.label}</strong></div><div class="summary-detail"><span>已经安排</span><strong>${amount(totalMinutes())}</strong></div><div class="summary-detail"><span>每周可用</span><strong>${state.person.weeklyHours} 小时</strong></div>
         <a href="#pace" class="text-btn">调整我的节奏 ${icon('arrow')}</a>
       </section>
     </div>
@@ -2504,14 +2507,14 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   function renderWeek(){
     const dl=dayLoad(TODAY);
     main.innerHTML=pageHead('给这一周一点方向',`${dateLabel(WEEK)} – ${dateLabel(dateAt(6))} · 今天 ${dateLabel(TODAY)}`,button('export-calendar','导出日历',{icon:'download'})+button('add-entry','添加日程',{icon:'plus'})+button('generate','生成周计划',{primary:true,icon:'plus'}))+`
-    <div class="week-summary"><span><strong class="accent">${amount(totalMinutes())}</strong> 已安排</span><span><strong>${state.sessions.filter(s=>s.done).length} / ${state.sessions.length}</strong> 次已完成</span><span><span class="status-dot"></span>预计周负荷 <strong>${Math.round(weekLoad())}%</strong> · ${loadTone()}</span><span class="day-load-chip" style="--load-color:${dl.level.color}"><i class="status-dot" style="background:${dl.level.color}"></i>今日负荷 <strong>${Math.round(dl.percent)}%</strong> · ${dl.level.label}</span></div>
+    <div class="week-summary"><span><strong class="accent">${amount(totalMinutes())}</strong> 已安排</span><span><strong>${state.sessions.filter(s=>s.done).length} / ${state.sessions.length}</strong> 次已完成</span><span><span class="status-dot"></span>预计周负荷 <strong>${loadTone()}</strong></span><span class="day-load-chip" style="--load-color:${dl.level.color}"><i class="status-dot" style="background:${dl.level.color}"></i>今日负荷 <strong>${dl.level.label}</strong></span></div>
     <div class="toolbar"><div class="segmented" aria-label="计划视图">${[['week','周视图'],['month','月历'],['list','每日列表']].map(([id,label])=>`<button data-week-view="${id}" aria-pressed="${weekView===id}">${label}</button>`).join('')}</div><span class="note">${weekView==='week'?'每格按时间顺序排列，并标出当天负荷':weekView==='month'?'完整日历，点任意一天查看当天安排':'选一天，只看这一天的安排'}</span></div>
     ${weekView==='week'?weekGridMarkup():weekView==='month'?monthMarkup():dayPickerMarkup()}
     <p class="note" style="margin-top:22px">先调整「我的节奏」，再生成适合自己的安排。自动安排会留出休息间隔，并列出没有放下的练习。课程、上班等固定安排可以用「添加日程」直接放进来。</p>`;
   }
   // 周视图：每列顶部直接显示当天的日负荷。
   function weekGridMarkup(){
-    return `<section class="week-grid" aria-label="七天计划">${DAY_NAMES.map((d,i)=>{const date=dateAt(i),dl=dayLoad(date);return `<div class="day-column ${date===TODAY?'today':''}"><div class="day-heading"><span>${d}<i class="day-load" style="--load-color:${dl.level.color}" title="日负荷 ${Math.round(dl.percent)}%">${Math.round(dl.percent)}%</i></span><strong>${Number(date.slice(8))}</strong></div><div class="day-items">${sessionList(date).map(weekBlock).join('')||`<p class="day-rest">${i===6?'给自己留白<br>今天休息':'还没有安排<br>可以慢慢来'}</p>`}</div></div>`;}).join('')}</section>`;
+    return `<section class="week-grid" aria-label="七天计划">${DAY_NAMES.map((d,i)=>{const date=dateAt(i),dl=dayLoad(date);return `<div class="day-column ${date===TODAY?'today':''}"><div class="day-heading"><span>${d}<i class="day-load" style="--load-color:${dl.level.color}" title="日负荷 ${dl.level.label}">${dl.level.label}</i></span><strong>${Number(date.slice(8))}</strong></div><div class="day-items">${sessionList(date).map(weekBlock).join('')||`<p class="day-rest">${i===6?'给自己留白<br>今天休息':'还没有安排<br>可以慢慢来'}</p>`}</div></div>`;}).join('')}</section>`;
   }
   // 月历：完整一个月的格子，每格带当天负荷条；点格子看当天安排。
   function monthMarkup(){
@@ -2519,16 +2522,16 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     const weekdayHeads=DAY_NAMES.map(d=>`<div class="month-weekday">${d}</div>`).join('');
     const cells=grid.days.map(date=>{
       const inMonth=monthKey(date)===calMonth,list=sessionList(date),dl=dayLoad(date),selected=date===selectedDay;
-      return `<button class="month-cell ${inMonth?'':'out'} ${date===TODAY?'is-today':''} ${selected?'selected':''}" data-day="${date}" aria-pressed="${selected}" aria-label="${dateLabel(date)}，${list.length} 项安排，日负荷 ${Math.round(dl.percent)}%">
+      return `<button class="month-cell ${inMonth?'':'out'} ${date===TODAY?'is-today':''} ${selected?'selected':''}" data-day="${date}" aria-pressed="${selected}" aria-label="${dateLabel(date)}，${list.length} 项安排，日负荷 ${dl.level.label}">
         <span class="mc-top"><b>${Number(date.slice(8))}</b>${list.length?`<i class="mc-count">${list.length}</i>`:''}</span>
         <span class="mc-bar"><i style="width:${Math.min(100,dl.percent)}%;background:${dl.level.color}"></i></span>
-        <span class="mc-label" style="color:${list.length?dl.level.color:''}">${list.length?`${Math.round(dl.percent)}% · ${dl.level.label}`:'空'}</span>
+        <span class="mc-label" style="color:${list.length?dl.level.color:''}">${list.length?dl.level.label:'空'}</span>
       </button>`;
     }).join('');
-    return `<section class="calendar-panel"><div class="calendar-head"><button class="icon-btn round" data-action="month-prev" aria-label="上个月">←</button><div class="calendar-title"><p class="eyebrow" style="margin:0 0 4px">CALENDAR / 完整日历</p><h2>${monthLabel(calMonth)}</h2></div><div class="calendar-actions">${button('month-today','回到今天')}<button class="icon-btn round" data-action="month-next" aria-label="下个月">→</button></div></div><div class="month-weekdays">${weekdayHeads}</div><div class="month-grid">${cells}</div></section><h2 class="agenda-heading">${dateLabel(selectedDay)} · ${DAY_NAMES[weekdayOf(selectedDay)]}· 日负荷 ${Math.round(dayLoad(selectedDay).percent)}%</h2>${sessionList(selectedDay).length?sessionList(selectedDay).map(taskRow).join(''):'<div class="empty"><h3>这一天还没有安排</h3><p>点「添加日程」可以把课程、上班等安排放到这一天。</p></div>'}`;
+    return `<section class="calendar-panel"><div class="calendar-head"><button class="icon-btn round" data-action="month-prev" aria-label="上个月">←</button><div class="calendar-title"><p class="eyebrow" style="margin:0 0 4px">CALENDAR / 完整日历</p><h2>${monthLabel(calMonth)}</h2></div><div class="calendar-actions">${button('month-today','回到今天')}<button class="icon-btn round" data-action="month-next" aria-label="下个月">→</button></div></div><div class="month-weekdays">${weekdayHeads}</div><div class="month-grid">${cells}</div></section><h2 class="agenda-heading">${dateLabel(selectedDay)} · ${DAY_NAMES[weekdayOf(selectedDay)]}· 日负荷 ${dayLoad(selectedDay).level.label}</h2>${sessionList(selectedDay).length?sessionList(selectedDay).map(taskRow).join(''):'<div class="empty"><h3>这一天还没有安排</h3><p>点「添加日程」可以把课程、上班等安排放到这一天。</p></div>'}`;
   }
   function dayPickerMarkup(){
-    return `<div class="day-picker" aria-label="选择日期">${DAY_NAMES.map((d,i)=>`<button data-day="${dateAt(i)}" aria-pressed="${selectedDay===dateAt(i)}">${d}<span>${Number(dateAt(i).slice(8))}</span></button>`).join('')}</div><h2 class="agenda-heading">${dateLabel(selectedDay)} · ${DAY_NAMES[weekdayOf(selectedDay)]} · 日负荷 ${Math.round(dayLoad(selectedDay).percent)}%</h2>${sessionList(selectedDay).length?sessionList(selectedDay).map(taskRow).join(''):'<div class="empty"><h3>这一天还没有安排</h3><p>可以休息，也可以在生成计划时调整可用时间。</p></div>'}`;
+    return `<div class="day-picker" aria-label="选择日期">${DAY_NAMES.map((d,i)=>`<button data-day="${dateAt(i)}" aria-pressed="${selectedDay===dateAt(i)}">${d}<span>${Number(dateAt(i).slice(8))}</span></button>`).join('')}</div><h2 class="agenda-heading">${dateLabel(selectedDay)} · ${DAY_NAMES[weekdayOf(selectedDay)]} · 日负荷 ${dayLoad(selectedDay).level.label}</h2>${sessionList(selectedDay).length?sessionList(selectedDay).map(taskRow).join(''):'<div class="empty"><h3>这一天还没有安排</h3><p>可以休息，也可以在生成计划时调整可用时间。</p></div>'}`;
   }
   function weekBlock(s){
     const a=interest(s.interestId),custom=isCustom(s),li=sessionLoad(s);
@@ -2745,7 +2748,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     });
     saveState();closeDialog();
     if(page==='week')renderWeek();else location.hash='week';
-    toast(added?`已把本周 ${added} 天的安排放进周计划，当前周负荷 ${Math.round(weekLoad())}%。${skipped?`另有 ${skipped} 天因时段不足未排入。`:''}`:'这一周的可用时段放不下这份方案，可以先调整节奏或删减已有安排。');
+    toast(added?`已把本周 ${added} 天的安排放进周计划，当前周负荷为${loadTone()}。${skipped?`另有 ${skipped} 天因时段不足未排入。`:''}`:'这一周的可用时段放不下这份方案，可以先调整节奏或删减已有安排。');
   }
   /* ───────── 我的节奏：完整问卷（5 屏 19 题 + 精细化 4 题） ───────── */
   const QUIZ_DOMAINS=InterestClassifier.categories().map(c=>({key:c.key,label:c.label}));
@@ -2985,7 +2988,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
         </div>
         <div class="section-heading" style="margin-top:34px"><div><p class="eyebrow" style="margin-bottom:5px">LOAD / 负荷</p><h2>每项兴趣的负荷（五档）</h2></div><a href="#week" class="text-btn">回到周计划 ${icon('arrow')}</a></div>
         <div class="load-board">${rows}</div>
-        <p class="note" style="margin-top:18px">五档由低到高：很轻松 → 比较轻松 → 刚刚好 → 有点吃力 → 太吃力。档位越高，越建议拆小、分两天做。当前预计周负荷 ${Math.round(weekLoad())}%。</p>
+        <p class="note" style="margin-top:18px">五档由低到高：很轻松 → 比较轻松 → 刚刚好 → 有点吃力 → 太吃力。档位越高，越建议拆小、分两天做。当前预计周负荷：${loadTone()}。</p>
       </section>
       <aside class="profile-explainer">
         <p class="eyebrow" style="margin-bottom:13px">QUICK TUNE</p><h3>不用重答问卷，<br>也能先微调</h3>
@@ -2997,7 +3000,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
           <section class="form-section"><label class="field-label" for="recovery">最近的精力状态<output id="recoveryValue">${Math.round(p.recovery*100)}%</output></label><input id="recovery" name="recovery" type="range" min=".2" max="1" step=".1" value="${p.recovery}"></section>
           <div class="form-actions"><button class="btn primary" type="submit">保存微调</button><span class="form-message" id="paceMessage" role="status"></span></div>
         </form>
-        <div class="profile-summary"><p>当前每周 ${p.weeklyHours} 小时<br>一次 ${p.block} 分钟<br>预计周负荷 ${Math.round(weekLoad())}%</p></div>
+        <div class="profile-summary"><p>当前每周 ${p.weeklyHours} 小时<br>一次 ${p.block} 分钟<br>预计周负荷 ${loadTone()}</p></div>
       </aside>
     </div>`;
   }
@@ -3143,7 +3146,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     const warnings=[...(tt.warnings||[])];
     if(skipped)warnings.push(`${skipped} 次练习与已完成记录或你添加的日程时间太近，暂时没有安排。`);
     if(tt.unscheduled?.length)warnings.push(...tt.unscheduled.map(x=>typeof x==='string'?x:(x.title||interest(x.activityId)?.name||'有练习未能安排')));
-    openDialog('这一周已经排好',`<div class="dialog-body"><p class="dialog-lead">已保留 ${completed.length} 次完成记录${fixed.length?`和 ${fixed.length} 条自定义日程`:''}，并安排 ${items.length} 次练习。${notPlaced?`${notPlaced} 项未放进计划。`:'每次练习之间都留了休息间隔。'}</p><p class="note">预计周负荷 ${Math.round(weekLoad())}% · ${loadTone()}</p>${warnings.length?`<p class="eyebrow" style="margin:22px 0 10px">安排说明</p><ul class="about-list">${warnings.map(w=>`<li>${e(w)}</li>`).join('')}</ul>`:''}</div>`,button('go-week','查看周计划',{primary:true}));
+    openDialog('这一周已经排好',`<div class="dialog-body"><p class="dialog-lead">已保留 ${completed.length} 次完成记录${fixed.length?`和 ${fixed.length} 条自定义日程`:''}，并安排 ${items.length} 次练习。${notPlaced?`${notPlaced} 项未放进计划。`:'每次练习之间都留了休息间隔。'}</p><p class="note">预计周负荷：${loadTone()}</p>${warnings.length?`<p class="eyebrow" style="margin:22px 0 10px">安排说明</p><ul class="about-list">${warnings.map(w=>`<li>${e(w)}</li>`).join('')}</ul>`:''}</div>`,button('go-week','查看周计划',{primary:true}));
     render();
   }
   function showError(id,text){const el=document.getElementById(id);el.textContent=text;el.hidden=false;}
