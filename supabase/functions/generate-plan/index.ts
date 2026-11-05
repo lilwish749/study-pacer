@@ -81,6 +81,101 @@ function systemPrompt(hobby: string, goal: string, hours: string): string {
 本周细化要与当前所在的第一阶段目标对应。如果某天的“活动”描述少于 20 字，请重新生成那一天的内容。`;
 }
 
+// ===== 日程分类模式：判断类型 + 每小时消耗强度 =====
+// 强度不含时长；时长由前端换算进每日负荷，避免重复计算。
+const CLASSIFY_KINDS = [
+  'class', 'study', 'work', 'project', 'exam', 'sport', 'social', 'chore', 'commute', 'rest', 'other',
+];
+
+function classifyPrompt(person: Record<string, unknown>): string {
+  return `你是日程分类与个人负荷评估助手。根据用户提供的日程名称、备注、时长和个人节奏，判断它属于哪一类，并评估每小时的消耗强度。
+
+类型只能从下面选一个 key：
+class（课程/讲座/培训）、study（自学/作业/复习）、work（工作/会议/值班）、project（项目/创作/开发）、exam（考试/测验/答辩）、sport（运动/训练）、social（社交/聚会/社团）、chore（家务/采购/生活事务）、commute（通勤/出行）、rest（休息/恢复）、other（其他）
+
+同时给出：
+- typeLabel：不超过 8 个字，优先取自名称里的核心词（如「高等数学课」→「数学课」），禁止用「未知」「其他」「安排」这类泛称
+- domainLabel：不超过 6 字的具体领域，如「数学」「语言」「编程」「运动」「职场」「生活」；无法判断时用「综合」
+- intensity：0–100，表示每小时的消耗强度，不要考虑时长。40 以下为轻量日常，40–70 为普通课程或工作，70–90 为高强度脑力/体力，90 以上为考试冲刺或重体力
+- reason：不超过 24 字，说明最主要的判断依据
+- confidence：0–1，表示你对这次判断的把握
+
+只输出一个 JSON 对象，不要 Markdown，不要解释。字段必须齐全。
+示例：{"kind":"class","typeLabel":"数学课","domainLabel":"数学","intensity":72,"reason":"需要连续推导和高度专注","confidence":0.86}
+
+用户节奏参考：${JSON.stringify(person)}`;
+}
+
+function extractJson(text: string): Record<string, unknown> | null {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function normalizeClassify(raw: Record<string, unknown>) {
+  const kind = CLASSIFY_KINDS.includes(String(raw.kind)) ? String(raw.kind) : 'other';
+  return {
+    kind,
+    typeLabel: String(raw.typeLabel || '').trim().slice(0, 8) || '自定义安排',
+    domainLabel: String(raw.domainLabel || '').trim().slice(0, 6) || '生活',
+    intensity: Math.round(clampNumber(raw.intensity, 0, 100, 60)),
+    reason: String(raw.reason || '').trim().slice(0, 24) || '按活动性质综合判断',
+    confidence: clampNumber(raw.confidence, 0, 1, 0.75),
+  };
+}
+
+async function classifyActivity(apiKey: string, payload: Record<string, unknown>) {
+  let lastError: Error | null = null;
+  for (const model of MODEL_LIST) {
+    const response = await fetch(`${DASHSCOPE_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: classifyPrompt((payload.person as Record<string, unknown>) || {}) },
+          {
+            role: 'user',
+            content: `名称：${payload.title}\n备注：${payload.note || '无'}\n时长：${payload.minutes} 分钟`,
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 260,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const text = String(data?.choices?.[0]?.message?.content || '').trim();
+      const parsed = extractJson(text);
+      if (parsed) return normalizeClassify(parsed);
+      lastError = new Error('模型没有返回可解析的分类结果。');
+      continue;
+    }
+
+    const detail = (await response.text()).slice(0, 200);
+    console.error(`classify ${model} ${response.status}: ${detail}`);
+    if (response.status === 401) throw new Error('DASHSCOPE_API_KEY 无效或没有权限。');
+    if ([400, 403, 404, 429].includes(response.status) || response.status >= 500) {
+      lastError = new Error('分类服务暂时不可用，请稍后再试。');
+      continue;
+    }
+    lastError = new Error('分类失败，请稍后再试。');
+  }
+  throw lastError || new Error('分类失败，请稍后再试。');
+}
+
 async function callDashScope(apiKey: string, hobby: string, goal: string, hours: string): Promise<string> {
   let lastError: Error | null = null;
 
@@ -148,15 +243,32 @@ Deno.serve(async (req: Request) => {
     return json({ error: '服务端还没有配置 DASHSCOPE_API_KEY，请先在 Supabase 中设置。' }, 500);
   }
 
-  let hobby = '', goal = '', hours = '1';
+  let body: Record<string, unknown> = {};
   try {
-    const body = await req.json();
-    hobby = String(body?.hobby ?? '').trim();
-    goal = String(body?.goal ?? '').trim();
-    hours = String(body?.hours ?? '').trim();
+    body = await req.json();
   } catch {
     return json({ error: '请求内容不是有效的 JSON。' }, 400);
   }
+
+  if (body?.mode === 'classify') {
+    const title = String(body.title ?? '').trim().slice(0, 60);
+    if (!title) return json({ error: '请先输入日程名称。' }, 400);
+    const note = String(body.note ?? '').trim().slice(0, 120);
+    const minutes = clampNumber(body.minutes, 1, 720, 60);
+    try {
+      const person = (body.person as Record<string, unknown>) || {};
+      const result = await classifyActivity(apiKey, { title, note, minutes, person });
+      return json({ result });
+    } catch (error) {
+      const message = String((error as Error)?.message || '分类失败，请稍后再试。');
+      console.error('classify failed:', message);
+      return json({ error: message }, 502);
+    }
+  }
+
+  let hobby = String(body?.hobby ?? '').trim();
+  let goal = String(body?.goal ?? '').trim();
+  let hours = String(body?.hours ?? '').trim();
 
   if (!hobby) return json({ error: '请先输入一个兴趣爱好。' }, 400);
   if (hobby.length > 40) hobby = hobby.slice(0, 40);
