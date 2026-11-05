@@ -275,6 +275,12 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
  .load-preview-inner .load-steps{margin-left:0}
 }
 @media(min-width:1550px){.month-cell{min-height:108px}}
+/* 日程卡片只留下时间与名称，其余信息放进详情页 */
+.week-block h3{font-size:15px;font-weight:600;line-height:1.45;margin:0;color:var(--text)}
+.week-block .block-time{font-size:10.5px;margin-bottom:6px;color:var(--muted);letter-spacing:.02em}
+.task-row{min-height:72px}
+.task-copy h3{font-size:15px;font-weight:600;line-height:1.4;margin:0;letter-spacing:-.01em}
+.task-time{font-size:13px}
 </style>
 </head>
 <body>
@@ -2481,10 +2487,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   }
   function taskRow(s){
     const a=interest(s.interestId);if(!isCustom(s)&&!a)return '';
-    const li=sessionLoad(s);
-    const note=s.done?'已完成本次安排':(isCustom(s)?(s.note||`固定安排 · 自动识别为${kindLabel(s)} · ${li?li.score:0} 分负荷`):(s.detail||planDayFor(s)?'点击查看这一天的计划细则':(a.cards?.[0]?.deliverable||a.goal)));
-    const meta=isCustom(s)?`<span class="tag neutral">${e(kindLabel(s))}</span><span class="load-label" data-heavy="${li?li.score>=76:false}" style="color:${li?li.color:'inherit'}">${li?e(li.label):''}</span>`:`<span class="load-label" data-heavy="${li?li.score>=76:false}" style="color:${li?li.color:'inherit'}">${li?e(li.label):''}</span>`;
-    return `<div class="task-row ${s.done?'done':''}"><label class="check-wrap"><input class="check" type="checkbox" data-complete="${e(s.id)}" ${s.done?'checked':''} aria-label="${e(s.done?'取消完成':'标记完成')} ${e(sessionTitle(s))}"></label><div class="task-time">${s.start}<small>${duration(s)} 分钟</small></div><div class="task-copy" data-action="session-detail" data-id="${e(s.id)}" title="点击查看计划细则"><h3>${e(sessionTitle(s))}</h3><p>${e(note)}</p></div><div class="task-end">${meta}<button class="icon-btn" data-action="${isCustom(s)?'edit-entry':'move-session'}" data-id="${e(s.id)}" aria-label="调整 ${e(sessionTitle(s))} 的时间">${icon('edit')}</button></div></div>`;
+    return `<div class="task-row ${s.done?'done':''}"><label class="check-wrap"><input class="check" type="checkbox" data-complete="${e(s.id)}" ${s.done?'checked':''} aria-label="${e(s.done?'取消完成':'标记完成')} ${e(sessionTitle(s))}"></label><div class="task-time">${s.start}</div><div class="task-copy" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情"><h3>${e(sessionTitle(s))}</h3></div><div class="task-end"><button class="icon-btn" data-action="${isCustom(s)?'edit-entry':'move-session'}" data-id="${e(s.id)}" aria-label="调整 ${e(sessionTitle(s))} 的时间">${icon('edit')}</button></div></div>`;
   }
   function renderInterests(){
     main.innerHTML=pageHead('让兴趣有个去处','先收好想做的事，再决定什么时候开始。',button('add-interest','记录新兴趣',{primary:true,icon:'plus'}))+`
@@ -2534,9 +2537,8 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     return `<div class="day-picker" aria-label="选择日期">${DAY_NAMES.map((d,i)=>`<button data-day="${dateAt(i)}" aria-pressed="${selectedDay===dateAt(i)}">${d}<span>${Number(dateAt(i).slice(8))}</span></button>`).join('')}</div><h2 class="agenda-heading">${dateLabel(selectedDay)} · ${DAY_NAMES[weekdayOf(selectedDay)]} · 日负荷 ${dayLoad(selectedDay).level.label}</h2>${sessionList(selectedDay).length?sessionList(selectedDay).map(taskRow).join(''):'<div class="empty"><h3>这一天还没有安排</h3><p>可以休息，也可以在生成计划时调整可用时间。</p></div>'}`;
   }
   function weekBlock(s){
-    const a=interest(s.interestId),custom=isCustom(s),li=sessionLoad(s);
-    const detail=s.done?'✓ 已完成':`${duration(s)} 分钟${custom?` · ${e(kindLabel(s))}`:''}${li?` · ${li.label} ${li.score} 分`:''}`;
-    return `<article class="week-block ${s.done?'done':''} ${custom?'custom':''}" style="--load-color:${li?li.color:'#807499'}" data-action="session-detail" data-id="${e(s.id)}" title="点击查看计划细则"><span class="block-time">${s.start} – ${s.end}</span><h3>${e(sessionTitle(s))}</h3><p>${detail}</p><button class="text-btn" data-action="${custom?'edit-entry':'move-session'}" data-id="${e(s.id)}">${custom?'编辑安排':'调整时间'} ${icon('edit')}</button></article>`;
+    const custom=isCustom(s),li=sessionLoad(s);
+    return `<article class="week-block ${s.done?'done':''} ${custom?'custom':''}" style="--load-color:${li?li.color:'#807499'}" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情"><span class="block-time">${s.start} – ${s.end}${s.done?' · 已完成':''}</span><h3>${e(sessionTitle(s))}</h3></article>`;
   }
   // 推荐参考：把「网站/App/方法」拆成小标签，识别到公开网址时变成可点击链接。
   function refChips(text){
