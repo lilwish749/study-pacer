@@ -240,6 +240,8 @@ dialog{color:var(--text);background:var(--surface);border:1px solid #505050;padd
 .load-gauge .gauge-score{color:#8f88a3;font-variant-numeric:tabular-nums}
 .load-gauge .gauge-src{color:var(--muted)}
 .load-gauge .gauge-src::before{content:"·";margin-right:6px;color:#4c475a}
+.ai-hint{margin:-2px 0 14px;font-size:11px;color:var(--muted);line-height:1.55}
+.ai-chip{display:inline-flex;align-items:center;margin-right:5px;padding:0 5px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);font-size:9px;letter-spacing:.04em;line-height:1.6}
 
 /* 动效 */
 .content.page-in{animation:pageIn .42s var(--ease)}
@@ -1601,9 +1603,16 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   const WEEK = weekStartOf(TODAY);
   const DAY_NAMES = ['周一','周二','周三','周四','周五','周六','周日'];
   const SCHEDULE_KINDS = [
-    {key:'class',label:'课程'},
-    {key:'work',label:'工作'},
-    {key:'project',label:'项目'},
+    {key:'class',label:'课程 / 讲座'},
+    {key:'study',label:'自学 / 作业'},
+    {key:'work',label:'工作 / 会议'},
+    {key:'project',label:'项目 / 创作'},
+    {key:'exam',label:'考试 / 答辩'},
+    {key:'sport',label:'运动 / 训练'},
+    {key:'social',label:'社交 / 活动'},
+    {key:'chore',label:'家务 / 生活'},
+    {key:'commute',label:'通勤 / 出行'},
+    {key:'rest',label:'休息 / 恢复'},
     {key:'other',label:'其他'}
   ];
   const NAV = [
@@ -2095,15 +2104,30 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     return splitPlanByDay(planWeeklyText(a.aiPlan)).find(d=>d.day===dayIndex(s.date))||null;
   }
   function sessionTitle(s){if(isCustom(s))return s.title||'未命名安排';if(s.title)return s.title;const d=planDayFor(s);return (d&&d.title)||activityName(interest(s.interestId));}
-  function kindLabel(s){return SCHEDULE_KINDS.find(k=>k.key===s.kind)?.label||'日程';}
+  function kindLabel(s){
+    if(isCustom(s)&&s.ai&&s.ai.typeLabel&&s.ai.kind===s.kind)return s.ai.typeLabel;
+    return SCHEDULE_KINDS.find(k=>k.key===s.kind)?.label||'日程';
+  }
+  function aiIntensity(s){
+    if(!isCustom(s)||!s.ai)return null;
+    const n=Number(s.ai.intensity);
+    return Number.isFinite(n)?Math.max(0,Math.min(100,n)):null;
+  }
   function sessionList(date){return state.sessions.filter(s=>!date||s.date===date).slice().sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));}
   function score(a){return LMS.scoreActivity(state.person,a);}
   function scoreLabel(a){return LMS.levelOf(score(a).score).label;}
   // 自定义日程：按名称自动识别「课程 / 工作 / 项目 / 其他」，并复用同一套评分引擎估算负荷。
   const KIND_HINTS=[
-    {kind:'class',re:/课|上课|课程|讲座|培训|考试|自习|lecture|seminar|class/i},
+    {kind:'exam',re:/考试|测验|测验|答辩|口试|笔试|期末|期中|exam|quiz/i},
+    {kind:'class',re:/课|上课|课程|讲座|培训|实验课|lecture|seminar|class/i},
+    {kind:'study',re:/自学|自习|复习|预习|作业|刷题|背单词|阅读|看书|study|homework|review/i},
     {kind:'work',re:/上班|工作|值班|会议|周会|例会|面试|实习|加班|班|shift|meeting|work/i},
-    {kind:'project',re:/项目|论文|毕业设计|作业|答辩|开发|设计稿|方案|project|thesis|deadline/i}
+    {kind:'project',re:/项目|论文|毕业设计|开发|设计稿|方案|创作|写稿|project|thesis|deadline/i},
+    {kind:'sport',re:/健身|跑步|游泳|球|训练|瑜伽|骑行|爬山|运动|gym|run|swim|workout/i},
+    {kind:'social',re:/聚会|聚餐|社团|活动|婚礼|生日|派对|社交|party|meetup/i},
+    {kind:'chore',re:/家务|打扫|做饭|采购|洗衣|整理|买菜|chore|grocery/i},
+    {kind:'commute',re:/通勤|通学|路上|开车|地铁|公交|出差|机场|高铁|commute|travel/i},
+    {kind:'rest',re:/休息|睡觉|午休|放松|冥想|恢复|rest|nap/i}
   ];
   function autoKindOf(title){
     const text=String(title||'');
@@ -2122,10 +2146,18 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   }
   function sessionScore(s){
     if(!isCustom(s)){const a=interest(s.interestId);return a?score(a):{score:0,parts:{},mismatch:0};}
+    const ai=aiIntensity(s);
+    if(ai!=null)return {score:ai,parts:{},mismatch:0,source:'ai'};
     return LMS.scoreActivity(state.person,customActivity(s));
   }
   function sessionLoad(s){
     if(!isCustom(s)){const a=interest(s.interestId);return a?loadInfo(a):null;}
+    const ai=aiIntensity(s);
+    if(ai!=null){
+      const g=gradeOfScore(ai);
+      const conf=Number(s.ai.confidence);
+      return {...g,categoryLabel:s.ai.domainLabel||'自定义安排',kind:s.kind,top:s.ai.reason||'AI 综合判断',advice:null,confidence:Number.isFinite(conf)?Math.max(0,Math.min(1,conf)):0.8,source:'ai'};
+    }
     const activity=customActivity(s),sc=LMS.scoreActivity(state.person,activity);
     const g=gradeOfScore(sc.score),adv=LMS.prescriptions(state.person,activity,sc);
     return {...g,categoryLabel:activity.categoryLabel,kind:activity.kind,top:LMS.topContributor(sc.parts,LMS.weightsOf(state.person)),advice:adv[0],confidence:LMS.computeConfidence(state.person)};
@@ -2533,7 +2565,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     const day=custom?null:planDayFor(s);
     const detail=s.detail||(day&&day.detail);
     const body=custom
-      ?`<div class="dialog-body"><p class="detail-meta"><span class="tag neutral">${e(kindLabel(s))}</span><span class="tag">自动识别 · ${e(li?li.categoryLabel:'生活事务')}</span><span class="tag neutral">${s.start}–${s.end}</span><span class="tag neutral">${duration(s)} 分钟</span></p><div class="load-card" style="--load-color:${li?li.color:'#807499'}"><div class="load-card-head"><p class="eyebrow" style="margin:0">负荷评估 / 五档</p><b>${li?li.label:'—'}</b></div>${li?loadGauge(li):''}<p class="load-note">${e(li?li.note:'')} 类型和负荷由名称自动识别，也可以手动改类型后再保存。</p><p class="load-src">主要负担来源：${e(li?li.top:'—')}</p></div>${s.note?`<p class="dialog-lead">${e(s.note)}</p>`:''}<p class="note">这是自己添加的固定安排。</p></div>`
+      ?`<div class="dialog-body"><p class="detail-meta"><span class="tag neutral">${e(kindLabel(s))}</span><span class="tag">自动识别 · ${e(li?li.categoryLabel:'生活事务')}</span><span class="tag neutral">${s.start}–${s.end}</span><span class="tag neutral">${duration(s)} 分钟</span></p><div class="load-card" style="--load-color:${li?li.color:'#807499'}"><div class="load-card-head"><p class="eyebrow" style="margin:0">负荷评估 / 五档</p><b>${li?li.label:'—'}</b></div>${li?loadGauge(li):''}<p class="load-note">${e(li?li.note:'')} 类型与负荷由 AI 结合名称和备注判断，也可以手动改类型后保存。</p><p class="load-src">主要负担来源：${e(li?li.top:'—')}</p></div>${s.note?`<p class="dialog-lead">${e(s.note)}</p>`:''}<p class="note">这是自己添加的固定安排。</p></div>`
       :`<div class="dialog-body"><p class="detail-meta"><span class="tag">${e(a?a.categoryLabel:'兴趣')}</span><span class="tag neutral">${s.start}–${s.end}</span><span class="tag neutral">${duration(s)} 分钟</span></p>${detail?planDetailMarkup(detail):`<p class="dialog-lead">${e(a?a.goal:'')}</p><p class="note">这份安排来自自动排程。想要每天的具体细则，可以在兴趣详情里生成 AI 方案后再采纳。</p>`}</div>`;
     openDialog(sessionTitle(s),body,button('close-dialog','关闭')+(custom?button('edit-entry','编辑安排',{id:s.id}):button('move-session','调整时间',{id:s.id})));
   }
@@ -2994,16 +3026,95 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   }
   function openEntry(id){
     const s=id?state.sessions.find(x=>x.id===id):null,custom=!!s;
-    openDialog(custom?'编辑日程':'添加自己的日程',`<form id="entryForm" data-entry="${custom?e(s.id):''}"><div class="dialog-body"><p class="dialog-lead">把课程、上班、项目或任何固定安排直接放进日历，不用先进兴趣池。</p><div class="field"><label for="entryTitle">安排名称</label><input id="entryTitle" name="title" maxlength="60" placeholder="例如：高等数学课、产品周会、毕业设计" value="${e(custom?s.title:'')}" required autofocus><p id="entryKindNote" class="category-note entry-kind-note">${custom?`当前类型：${e(kindLabel(s))}。改名会自动重新识别。`:'输入名称后会自动识别类型，并按你的节奏估算这条日程的负荷。'}</p></div><div class="form-pair"><div class="field"><label for="entryKind">类型（自动识别，可调整）</label><select id="entryKind" name="kind">${SCHEDULE_KINDS.map(k=>`<option value="${k.key}" ${custom&&s.kind===k.key?'selected':''}>${k.label}</option>`).join('')}</select></div><div class="field"><label for="entryDate">日期</label><input type="date" id="entryDate" name="date" value="${custom?s.date:selectedDay}" required></div></div><div class="form-pair"><div class="field"><label for="entryStart">开始时间</label><input type="time" id="entryStart" name="start" value="${custom?s.start:'08:00'}" required></div><div class="field"><label for="entryEnd">结束时间</label><input type="time" id="entryEnd" name="end" value="${custom?s.end:'09:00'}" required></div></div><div class="field"><label for="entryNote">备注（可选）</label><textarea id="entryNote" name="note" maxlength="120" placeholder="地点、老师，或者这件事要做到什么程度。">${e(custom?(s.note||''):'')}</textarea></div><div id="entryLoadPreview" class="load-preview"></div><p class="note">这类安排按真实时间填写，不受学习可用时段限制；保存时会检查与当天其他安排是否重叠。</p><p id="entryError" class="field-error" role="alert" hidden></p></div><div class="dialog-footer">${custom?button('ask-delete-entry','删除日程',{id:s.id,className:'danger'}):''}${button('close-dialog','取消')}<button class="btn primary" type="submit">${custom?'保存修改':'加入日历'}</button></div></form>`,'CUSTOM SCHEDULE / 自定义安排');
+    entryAI=custom&&s.ai?{...s.ai}:null;
+    entryAIKey=entryAI?entryKey(s.title,s.note||''):'';
+    entryAIState=entryAI?'done':'idle';
+    entryKindTouched=false;
+    openDialog(custom?'编辑日程':'添加自己的日程',`<form id="entryForm" data-entry="${custom?e(s.id):''}"><div class="dialog-body"><p class="dialog-lead">AI 会结合名称与备注判断类型和每小时负荷，你仍可手动调整。</p><div class="field"><label for="entryTitle">安排名称</label><input id="entryTitle" name="title" maxlength="60" placeholder="例如：高等数学课、产品周会、毕业设计" value="${e(custom?s.title:'')}" required autofocus><p id="entryKindNote" class="category-note entry-kind-note">${custom?`当前类型：${e(kindLabel(s))}。改名会自动重新识别。`:'输入名称后会自动识别类型，并按你的节奏估算这条日程的负荷。'}</p></div><div class="form-pair"><div class="field"><label for="entryKind">类型（自动识别，可调整）</label><select id="entryKind" name="kind">${SCHEDULE_KINDS.map(k=>`<option value="${k.key}" ${custom&&s.kind===k.key?'selected':''}>${k.label}</option>`).join('')}</select></div><div class="field"><label for="entryDate">日期</label><input type="date" id="entryDate" name="date" value="${custom?s.date:selectedDay}" required></div></div><p id="entryAiHint" class="ai-hint">AI 会结合名称与备注判断类型和每小时消耗强度。</p><div class="form-pair"><div class="field"><label for="entryStart">开始时间</label><input type="time" id="entryStart" name="start" value="${custom?s.start:'08:00'}" required></div><div class="field"><label for="entryEnd">结束时间</label><input type="time" id="entryEnd" name="end" value="${custom?s.end:'09:00'}" required></div></div><div class="field"><label for="entryNote">备注（可选）</label><textarea id="entryNote" name="note" maxlength="120" placeholder="地点、老师，或者这件事要做到什么程度。">${e(custom?(s.note||''):'')}</textarea></div><div id="entryLoadPreview" class="load-preview"></div><p class="note">这类安排按真实时间填写，不受学习可用时段限制；保存时会检查与当天其他安排是否重叠。</p><p id="entryError" class="field-error" role="alert" hidden></p></div><div class="dialog-footer">${custom?button('ask-delete-entry','删除日程',{id:s.id,className:'danger'}):''}${button('close-dialog','取消')}<button class="btn primary" type="submit">${custom?'保存修改':'加入日历'}</button></div></form>`,'CUSTOM SCHEDULE / 自定义安排');
+    paintEntryPreview();updateEntryHints(entryAI);
+  }
+  // ===== 自定义日程的 AI 分类与负荷 =====
+  // 前端先给出本地规则的即时结果，再异步用百炼补上更细的类型与每小时消耗强度。
+  let entryAI=null, entryAIKey='', entryAITimer=null, entryAIReq=0, entryAIState='idle', entryKindTouched=false;
+  function entryKey(title,note){return String(title||'').trim()+'|'+String(note||'').trim();}
+  function entryMinutes(){
+    const start=String(document.getElementById('entryStart')?.value||''),end=String(document.getElementById('entryEnd')?.value||'');
+    if(!start||!end)return 60;
+    const n=minutes(end)-minutes(start);
+    return n>0?n:60;
+  }
+  function aiOfEntry(title,note){
+    return entryAI&&entryAIKey===entryKey(title,note)?entryAI:null;
+  }
+  async function fetchEntryClassify(title,note,min){
+    const person={weeklyHours:state.person?.weeklyHours,recovery:state.person?.recovery,peakTime:state.person?.peakTime,block:state.person?.block};
+    const {data,error}=await authClient.functions.invoke('generate-plan',{body:{mode:'classify',title,note,minutes:min,person}});
+    if(error)throw new Error(await readFunctionError(error));
+    const result=data&&data.result;
+    if(!result||!result.kind)throw new Error('AI 没有返回有效的分类结果。');
+    const n=Number(result.intensity);
+    return {...result,intensity:Number.isFinite(n)?Math.max(0,Math.min(100,n)):60};
+  }
+  function updateEntryHints(ai){
+    const title=String(document.getElementById('entryTitle')?.value||'').trim();
+    const kind=document.getElementById('entryKind')?.value||'other';
+    const note=document.getElementById('entryKindNote');
+    if(note){
+      if(!title)note.textContent='输入名称后会自动识别类型，并按你的节奏估算这条日程的负荷。';
+      else if(ai)note.textContent=`AI 判断为「${ai.typeLabel}」 · ${ai.domainLabel}`;
+      else if(entryAIState==='failed')note.textContent=`本地识别为「${SCHEDULE_KINDS.find(k=>k.key===kind)?.label||'其他'}」，AI 暂不可用，保存时会按本地规则估算负荷。`;
+      else note.textContent=`已识别为「${SCHEDULE_KINDS.find(k=>k.key===kind)?.label||'其他'}」，AI 正在细化类型与负荷。`;
+    }
+    const aiHint=document.getElementById('entryAiHint');
+    if(aiHint){
+      if(ai)aiHint.textContent=`依据：${ai.reason} · 把握 ${Math.round(Number(ai.confidence)*100)}%，可手动调整类型。`;
+      else if(entryAIState==='thinking'&&title)aiHint.textContent='AI 正在结合名称、备注与你的节奏判断…';
+      else if(entryAIState==='failed')aiHint.textContent='AI 暂不可用，保存时仍会按本地规则估算这条日程的负荷。';
+      else aiHint.textContent='AI 会结合名称与备注判断类型和每小时消耗强度。';
+    }
+  }
+  function applyEntryAI(){
+    const sel=document.getElementById('entryKind');
+    if(sel&&entryAI&&!entryKindTouched)sel.value=entryAI.kind;
+    updateEntryHints(entryAI);
     paintEntryPreview();
   }
-  // 输入名称时实时预览：自动识别类型 + 五档负荷。
+  function scheduleEntryAI(){
+    clearTimeout(entryAITimer);
+    const title=String(document.getElementById('entryTitle')?.value||'').trim();
+    if(!title){entryAIState='idle';paintEntryPreview();return;}
+    const note=String(document.getElementById('entryNote')?.value||'').trim();
+    const key=entryKey(title,note);
+    if(entryAI&&entryAIKey===key){entryAIState='done';paintEntryPreview();return;}
+    entryAIState='thinking';paintEntryPreview();updateEntryHints(null);
+    const req=++entryAIReq;
+    entryAITimer=setTimeout(async()=>{
+      try{
+        const ai=await fetchEntryClassify(title,note,entryMinutes());
+        if(req!==entryAIReq)return;
+        entryAI=ai;entryAIKey=key;entryAIState='done';applyEntryAI();
+      }catch(_){
+        if(req!==entryAIReq)return;
+        entryAIState='failed';entryAI=null;entryAIKey='';updateEntryHints(null);paintEntryPreview();
+      }
+    },700);
+  }
+  // 输入名称时实时预览：本地规则即时显示，AI 结果返回后替换为更细的类型与强度。
   function paintEntryPreview(){
     const box=document.getElementById('entryLoadPreview');if(!box)return;
     const title=String(document.getElementById('entryTitle')?.value||'').trim();
     if(!title){box.innerHTML='';return;}
-    const info=titleLoad(title),kind=autoKindOf(title);
-    box.innerHTML=`<div class="load-preview-inner" style="--load-color:${info.color}"><span>自动识别：<b>${SCHEDULE_KINDS.find(k=>k.key===kind).label}</b> · ${e(info.domain)}</span><b style="color:${info.color}">${info.label} · ${info.score} 分</b><div class="load-steps" role="img" aria-label="负荷五档中的第 ${info.tier} 档">${[1,2,3,4,5].map(n=>`<i class="${n<=info.tier?'on':''}"></i>`).join('')}</div></div>`;
+    const note=String(document.getElementById('entryNote')?.value||'').trim();
+    const ai=aiOfEntry(title,note),local=titleLoad(title);
+    const manualKind=entryKindTouched?String(document.getElementById('entryKind')?.value||''):'';
+    const useAI=ai&&!manualKind;
+    const kind=manualKind||(ai?ai.kind:autoKindOf(title));
+    const kindText=useAI?ai.typeLabel:(SCHEDULE_KINDS.find(k=>k.key===kind)?.label||'其他');
+    const domain=useAI?ai.domainLabel:local.domain;
+    const scoreValue=useAI?ai.intensity:local.score;
+    const info=useAI?{...gradeOfScore(scoreValue),domain}:local;
+    const chip=ai?'<span class="ai-chip">AI</span>':(entryAIState==='thinking'?'<span class="ai-chip">AI 判断中</span>':'');
+    box.innerHTML=`<div class="load-preview-inner" style="--load-color:${info.color}"><span>${chip}识别：<b>${e(kindText)}</b> · ${e(domain)}</span><b style="color:${info.color}">${info.label} · ${Math.round(scoreValue)} 分/小时</b><div class="load-steps" role="img" aria-label="负荷五档中的第 ${info.tier} 档">${[1,2,3,4,5].map(n=>`<i class="${n<=info.tier?'on':''}"></i>`).join('')}</div></div>`;
   }
   function askDeleteEntry(id){
     const s=state.sessions.find(x=>x.id===id);if(!s)return;
@@ -3147,9 +3258,17 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     if(input.id==='interestName'&&!dialogInterestId){const result=InterestClassifier.classify(input.value);const note=document.getElementById('categoryNote');if(result.recognized){document.getElementById('interestCategory').value=result.category;note.textContent=`建议类别：${result.categoryLabel}。可以自行调整。`;}else {document.getElementById('interestCategory').value='';note.textContent='还不能确定类别，请从上方选一个合适的类别。';}}
     if(input.id==='entryTitle'){
       const kind=autoKindOf(input.value),sel=document.getElementById('entryKind');
-      if(sel)sel.value=kind;
-      const note=document.getElementById('entryKindNote'),cls=InterestClassifier.classify(input.value);
-      if(note)note.textContent=input.value.trim()?`已自动识别为「${SCHEDULE_KINDS.find(k=>k.key===kind).label}」${cls.recognized?` · 学习方向：${cls.categoryLabel}`:''}`:'输入名称后会自动识别类型，并按你的节奏估算这条日程的负荷。';
+      if(sel&&!entryKindTouched)sel.value=kind;
+      paintEntryPreview();
+      scheduleEntryAI();
+    }
+    if(input.id==='entryNote'){
+      paintEntryPreview();
+      scheduleEntryAI();
+    }
+    if(input.id==='entryKind'){
+      entryKindTouched=true;
+      updateEntryHints(aiOfEntry(String(document.getElementById('entryTitle')?.value||'').trim(),String(document.getElementById('entryNote')?.value||'').trim()));
       paintEntryPreview();
     }
     if(input.id==='entryStart'||input.id==='moveStart'){
@@ -3169,7 +3288,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
       if(input.id==='quizEval')quiz.extra.evalAnxiety=Number(input.value);
     }
   });
-  document.addEventListener('submit',event=>{
+  document.addEventListener('submit',async event=>{
     const form=event.target;
     if(form.id==='authForm'){event.preventDefault();handleAuthSubmit(form);return;}
     if(!['paceForm','interestForm','moveForm','entryForm'].includes(form.id))return;event.preventDefault();
@@ -3208,7 +3327,15 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
       if(min<15||min>480){showError('entryError','结束时间要比开始时间晚 15–480 分钟。');return;}
       const others=state.sessions.filter(o=>o.id!==editing?.id&&o.date===date);
       if(others.some(o=>minutes(o.start)<to&&from<minutes(o.end))){showError('entryError','与这一天已有的安排时间重叠，请换一个时段。');return;}
-      const item={...(editing||{}),id:editing?.id||'custom-'+Date.now().toString(36),date,start,end,title,kind,note,done:editing?.done||false};
+      let ai=aiOfEntry(title,note);
+      if(!ai&&authClient){
+        try{
+          ai=await Promise.race([fetchEntryClassify(title,note,min),new Promise((_,reject)=>setTimeout(()=>reject(new Error('AI 判断超时')),2500))]);
+          entryAI=ai;entryAIKey=entryKey(title,note);
+        }catch(_){ai=null;}
+      }
+      const aiData=ai?{kind:ai.kind,typeLabel:ai.typeLabel,domainLabel:ai.domainLabel,intensity:ai.intensity,reason:ai.reason,confidence:ai.confidence}:undefined;
+      const item={...(editing||{}),id:editing?.id||'custom-'+Date.now().toString(36),date,start,end,title,kind,note,done:editing?.done||false,ai:aiData};
       if(editing)state.sessions[state.sessions.indexOf(editing)]=item;else state.sessions.push(item);
       saveState();closeDialog();render();toast(editing?'日程已更新。':'已加入这一周的安排。');
     }
