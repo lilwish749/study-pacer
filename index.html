@@ -2215,8 +2215,9 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     const ai=aiIntensity(s);
     if(ai!=null){
       const g=gradeOfScore(ai);
-      const conf=Number(s.ai.confidence);
-      return {...g,categoryLabel:s.ai.domainLabel||'自定义安排',kind:s.kind,top:s.ai.reason||'AI 综合判断',advice:null,confidence:Number.isFinite(conf)?Math.max(0,Math.min(1,conf)):0.8,source:'ai'};
+      const meta=s.ai||{};
+      const conf=Number(meta.confidence);
+      return {...g,categoryLabel:meta.domainLabel||'自定义安排',kind:s.kind,top:meta.reason||'AI 综合判断',advice:null,confidence:Number.isFinite(conf)?Math.max(0,Math.min(1,conf)):0.8,source:'ai'};
     }
     const activity=customActivity(s),sc=LMS.scoreActivity(state.person,activity);
     const g=gradeOfScore(sc.score),adv=LMS.prescriptions(state.person,activity,sc);
@@ -2297,13 +2298,14 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   function render(){
     navigation();
     try{({today:renderToday,interests:renderInterests,week:renderWeek,pace:renderPace,admin:renderAdmin}[page])();}
-    catch(error){console.warn('页面渲染失败',error);renderBroken();}
+    catch(error){brokenError=String((error&&error.message)||error);console.warn('页面渲染失败',error);renderBroken();}
     updateSaveStatus();animateMain();
     const dateLabelNode=document.getElementById('topbarDate');if(dateLabelNode)dateLabelNode.textContent=monthLabel(monthKey(TODAY));
   }
-  // 兜底页：某个板块渲染出错时给出提示，避免整块空白让用户无从下手。
+  // 兜底页：某个板块渲染出错时给出提示和具体错误，避免整块空白让用户无从下手。
+  let brokenError='';
   function renderBroken(){
-    main.innerHTML='<div class="empty" style="margin-top:40px"><h3>这个板块暂时打不开</h3><p>数据里可能有一条不完整的日程，刷新页面后会自动修复；如果仍然出现，可先正常使用其他板块。</p><a class="btn" href="#today">回到今日</a></div>';
+    main.innerHTML=`<div class="empty" style="margin-top:40px"><h3>这个板块暂时打不开</h3><p>数据里可能有一条不完整的日程。把下面这行错误信息发给开发者，可以精准定位：</p><p class="note" style="user-select:all;margin:14px 0">${e(brokenError||'未知错误')}</p><a class="btn" href="#today">回到今日</a></div>`;
   }
   function route(){
     if(!currentUser)return;
