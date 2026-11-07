@@ -1999,6 +1999,16 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     if(p.stateIndex==null)p.stateIndex=.6;
     if(!p.weights)p.weights=Object.assign({},LMS.WEIGHTS);
     saved.person=p;
+    // 旧格式或云端坏数据：缺日期/起止时间的日程会让周计划整页崩溃，这里统一修补。
+    if(!Array.isArray(saved.sessions))saved.sessions=[];
+    saved.sessions=saved.sessions.filter(s=>s&&typeof s==='object').map(s=>{
+      const fixed={...s};
+      if(!fixed.id)fixed.id='fix-'+Math.random().toString(36).slice(2,10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(String(fixed.date||'')))fixed.date=TODAY;
+      if(!/^\d{2}:\d{2}$/.test(String(fixed.start||'')))fixed.start='09:00';
+      if(!/^\d{2}:\d{2}$/.test(String(fixed.end||''))||minutes(fixed.end)<=minutes(fixed.start))fixed.end=hhmm(Math.min(minutes(fixed.start)+60,1439));
+      return fixed;
+    });
     return saved;
   }
   function writeLocalState(){
@@ -2104,7 +2114,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   const e=escapeHtml;
   function icon(name){return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]||ICONS.arrow}</svg>`;}
-  function minutes(time){const [h,m]=time.split(':').map(Number);return h*60+m;}
+  function minutes(time){const [h,m]=String(time||'').split(':').map(Number);return (h||0)*60+(m||0);}
   function hhmm(value){return String(Math.floor(value/60)).padStart(2,'0')+':'+String(value%60).padStart(2,'0');}
   function dateAt(index){return addDays(WEEK,index);}
   function dayIndex(date){return Math.round((Date.parse(date+'T00:00:00Z')-Date.parse(WEEK+'T00:00:00Z'))/86400000);}
@@ -2285,8 +2295,15 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   // 页面切换与视图切换都走同一条入场动画，避免生硬跳变。
   function animateMain(){main.classList.remove('page-in');void main.offsetWidth;main.classList.add('page-in');}
   function render(){
-    navigation();({today:renderToday,interests:renderInterests,week:renderWeek,pace:renderPace,admin:renderAdmin}[page])();updateSaveStatus();animateMain();
+    navigation();
+    try{({today:renderToday,interests:renderInterests,week:renderWeek,pace:renderPace,admin:renderAdmin}[page])();}
+    catch(error){console.warn('页面渲染失败',error);renderBroken();}
+    updateSaveStatus();animateMain();
     const dateLabelNode=document.getElementById('topbarDate');if(dateLabelNode)dateLabelNode.textContent=monthLabel(monthKey(TODAY));
+  }
+  // 兜底页：某个板块渲染出错时给出提示，避免整块空白让用户无从下手。
+  function renderBroken(){
+    main.innerHTML='<div class="empty" style="margin-top:40px"><h3>这个板块暂时打不开</h3><p>数据里可能有一条不完整的日程，刷新页面后会自动修复；如果仍然出现，可先正常使用其他板块。</p><a class="btn" href="#today">回到今日</a></div>';
   }
   function route(){
     if(!currentUser)return;
