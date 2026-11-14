@@ -281,6 +281,44 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
 .task-row{min-height:72px}
 .task-copy h3{font-size:15px;font-weight:600;line-height:1.4;margin:0;letter-spacing:-.01em}
 .task-time{font-size:13px}
+/* TIMETABLE IMPORT — 课程表图片识别：选图预览 + 核对列表 + 冲突标记 */
+.tt-file{width:100%;font-size:12px;color:var(--muted);border:1px dashed #505050;border-radius:10px;padding:12px;background:#101010;margin-bottom:18px}
+.tt-file::file-selector-button{margin-right:12px;min-height:34px;padding:0 12px;border:1px solid var(--line);background:#1c1c1c;color:var(--text);font-size:12px;border-radius:8px;cursor:pointer}
+.tt-file::file-selector-button:hover{background:#252329;border-color:#67616f}
+.tt-preview{display:flex;gap:14px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:18px;background:#101010}
+.tt-preview img{max-width:150px;max-height:110px;border-radius:8px;object-fit:contain;background:#000;border:1px solid var(--line)}
+.tt-preview .tt-meta{font-size:12px;color:var(--muted);line-height:1.8;min-width:0;overflow-wrap:anywhere}
+.tt-preview .tt-meta strong{display:block;color:var(--text);font-weight:500;font-size:13px;margin-bottom:4px}
+.tt-rows{display:flex;flex-direction:column;gap:10px;max-height:48vh;overflow:auto;padding-right:4px;margin-bottom:14px}
+.tt-row{display:grid;grid-template-columns:minmax(0,1.5fr) 84px 88px 88px minmax(0,1fr) 40px;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px;background:#101010}
+.tt-row input,.tt-row select{width:100%;min-height:38px;padding:0 9px;border:1px solid #505050;border-radius:8px;background:#0b0b0b;color:var(--text);font-size:12px}
+.tt-row input:focus,.tt-row select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgb(184 166 248 / 16%)}
+.tt-row .icon-btn{min-width:38px;min-height:38px;border-radius:8px;color:var(--muted)}
+.tt-row .icon-btn:hover{color:var(--danger);background:#1c1c1c}
+.week-block.clash{border-left-color:var(--warning);background:#201d16;box-shadow:inset 0 0 0 1px rgb(230 195 124 / 40%)}
+.week-block.clash:hover{background:#26221a}
+.week-block.clash .block-time:after{content:' · 时间重叠';color:var(--warning)}
+@media(max-width:760px){.tt-row{grid-template-columns:1fr 1fr}.tt-row [data-tt-field="courseName"],.tt-row [data-tt-field="location"]{grid-column:1 / -1}.tt-row .icon-btn{justify-self:end}.tt-preview{flex-direction:column;align-items:flex-start}.tt-preview img{max-width:100%;max-height:180px}}
+dialog.wide{width:min(920px,calc(100vw - 32px))}
+.toast-action{border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer;margin-left:4px}
+.toast-action:hover{background:rgb(184 166 248 / 14%)}
+.week-nav{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:14px 0 18px;background:#111}
+.week-nav-title{flex:1;min-width:0}
+.week-nav-title strong{display:block;font-size:14px;font-weight:500}
+.week-nav-actions{display:flex;align-items:center;gap:8px}
+.icon-btn.round{border:1px solid var(--line);border-radius:50%;width:36px;height:36px;display:grid;place-items:center;font-size:15px;color:var(--text)}
+.icon-btn.round:hover{border-color:var(--accent);color:var(--accent)}
+.tt-anchor{display:flex;flex-wrap:wrap;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:18px;background:#101010}
+.tt-anchor label{font-size:12px;color:var(--muted)}
+.tt-anchor input{min-height:38px;padding:0 10px;border:1px solid #505050;border-radius:8px;background:#0b0b0b;color:var(--text);font-size:13px}
+.tt-anchor span{font-size:11px;color:var(--muted)}
+.tt-row-weeks{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;gap:14px;border-top:1px dashed var(--line);padding-top:9px;margin-top:2px}
+.tt-weeks-label{font-size:11px;color:var(--muted);letter-spacing:.08em}
+.tt-row-weeks label{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.tt-row-weeks input[type="number"]{width:66px;min-height:32px;padding:0 8px}
+.tt-row-weeks select{min-height:32px;padding:0 8px;width:auto;min-width:76px}
+.tt-missing{font-size:11px;color:var(--warning)}
+.tt-row.needs-weeks{box-shadow:inset 0 0 0 1px rgb(230 195 124 / 55%)}
 </style>
 </head>
 <body>
@@ -1609,7 +1647,9 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   function weekStartOf(date){return addDays(date,-weekdayOf(date));}
   function isoLocal(d){return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());}
   const TODAY = isoLocal(new Date());
-  const WEEK = weekStartOf(TODAY);
+  const WEEK_ORIGIN = weekStartOf(TODAY);
+  // 周视图当前显示的那一周（周一的日期），可以用周导航前后切换。
+  let WEEK = WEEK_ORIGIN;
   const DAY_NAMES = ['周一','周二','周三','周四','周五','周六','周日'];
   const SCHEDULE_KINDS = [
     {key:'class',label:'课程 / 讲座'},
@@ -1676,7 +1716,8 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     clock:'<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>',
     check:'<path d="m5 12 5 5L20 7"/>',
     shield:'<path d="M12 3 5 6v5c0 4.6 3 7.7 7 9 4-1.3 7-4.4 7-9V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>',
-    refresh:'<path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/>'
+    refresh:'<path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/>',
+    image:'<rect x="3" y="4" width="18" height="16"/><circle cx="8.8" cy="9.6" r="1.5"/><path d="m4 17.5 4.6-4.6 3 3L14.7 12l5.3 5.5"/>'
   };
   const SAMPLE_ACTIVITIES = [
   {
@@ -2117,7 +2158,18 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   function minutes(time){const [h,m]=String(time||'').split(':').map(Number);return (h||0)*60+(m||0);}
   function hhmm(value){return String(Math.floor(value/60)).padStart(2,'0')+':'+String(value%60).padStart(2,'0');}
   function dateAt(index){return addDays(WEEK,index);}
-  function dayIndex(date){return Math.round((Date.parse(date+'T00:00:00Z')-Date.parse(WEEK+'T00:00:00Z'))/86400000);}
+  // 教学周基准：导入课程表时确认的「第 1 周周一」；没设置过就按今天所在周算。
+  function semesterStart(){return /^\d{4}-\d{2}-\d{2}$/.test(String(state.semesterStart||''))?weekStartOf(state.semesterStart):'';}
+  function weekNoOf(date){
+    const base=semesterStart();
+    if(!base)return null;
+    const n=Math.round((Date.parse(weekStartOf(date)+'T00:00:00Z')-Date.parse(base+'T00:00:00Z'))/604800000)+1;
+    return Number.isFinite(n)&&n>=1?n:null;
+  }
+  function weekTitle(){
+    const n=weekNoOf(WEEK);
+    return `${n!=null?`第 ${n} 周 · `:''}${dateLabel(WEEK)} – ${dateLabel(dateAt(6))}`;
+  }
   function dateLabel(date){return `${Number(date.slice(5,7))} 月 ${Number(date.slice(8))} 日`;}
   function monthKey(date){return String(date).slice(0,7);}
   function monthLabel(key){return `${Number(key.slice(0,4))} 年 ${Number(key.slice(5,7))} 月`;}
@@ -2139,7 +2191,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   function planDayFor(s){
     const a=interest(s.interestId);
     if(!a||!a.aiPlan)return null;
-    return splitPlanByDay(planWeeklyText(a.aiPlan)).find(d=>d.day===dayIndex(s.date))||null;
+    return splitPlanByDay(planWeeklyText(a.aiPlan)).find(d=>d.day===weekdayOf(s.date))||null;
   }
   function sessionTitle(s){if(isCustom(s))return s.title||'未命名安排';if(s.title)return s.title;const d=planDayFor(s);return (d&&d.title)||activityName(interest(s.interestId));}
   function kindLabel(s){
@@ -2280,10 +2332,10 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     return Math.round(effort/(dailyCapacityHours()*7)*1000)/10;
   }
   function loadTone(){return LMS.levelOfPercent(weekLoad()).label;}
-  function toast(message){
+  function toast(message,action){
     const node=document.getElementById('toast');
-    node.innerHTML=`<span>${e(message)}</span><button class="icon-btn" data-action="dismiss-toast" aria-label="关闭提示">${icon('close')}</button>`;
-    node.hidden=false;clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>node.hidden=true,5500);
+    node.innerHTML=`<span>${e(message)}</span>${action?`<button class="toast-action" data-action="${action.action}" ${action.id?`data-id="${e(action.id)}"`:''}>${e(action.label)}</button>`:''}<button class="icon-btn" data-action="dismiss-toast" aria-label="关闭提示">${icon('close')}</button>`;
+    node.hidden=false;clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>node.hidden=true,action?12000:5500);
   }
   function button(action,label,options={}){return `<button class="btn ${options.primary?'primary':''} ${options.className||''}" data-action="${action}" ${options.id?`data-id="${e(options.id)}"`:''}>${options.icon?icon(options.icon):''}${label}</button>`;}
   function pageHead(title,subtitle,actions=''){return `<div class="page-head"><div><p class="eyebrow" style="margin:0 0 9px">${navItems().find(n=>n.id===page).en}</p><h1 tabindex="-1">${title}</h1><p>${subtitle}</p></div><div class="head-actions">${actions}</div></div>`;}
@@ -2516,8 +2568,9 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     </section>`;
     loadAdminLogs();
   }
-  function openDialog(title,body,footer='',eyebrow='STUDY PACER'){
+  function openDialog(title,body,footer='',eyebrow='STUDY PACER',wide=false){
     if(modal.open)modal.close();
+    modal.classList.toggle('wide',!!wide);
     modal.innerHTML=`<div class="dialog-head"><div><p class="eyebrow">${eyebrow}</p><h2 id="modalTitle">${title}</h2></div><button class="icon-btn" data-action="close-dialog" aria-label="关闭对话框">${icon('close')}</button></div>${body}${footer?`<div class="dialog-footer">${footer}</div>`:''}`;
     modal.showModal();
   }
@@ -2572,11 +2625,13 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   }
   function renderWeek(){
     const dl=dayLoad(TODAY);
-    main.innerHTML=pageHead('给这一周一点方向',`${dateLabel(WEEK)} – ${dateLabel(dateAt(6))} · 今天 ${dateLabel(TODAY)}`,button('export-calendar','导出日历',{icon:'download'})+button('add-entry','添加日程',{icon:'plus'})+button('generate','生成周计划',{primary:true,icon:'plus'}))+`
-    <div class="week-summary"><span><strong class="accent">${amount(totalMinutes())}</strong> 已安排</span><span><strong>${state.sessions.filter(s=>s.done).length} / ${state.sessions.length}</strong> 次已完成</span><span><span class="status-dot"></span>预计周负荷 <strong>${loadTone()}</strong></span><span class="day-load-chip" style="--load-color:${dl.level.color}"><i class="status-dot" style="background:${dl.level.color}"></i>今日负荷 <strong>${dl.level.label}</strong></span></div>
+    const weekSessions=state.sessions.filter(s=>s.date>=WEEK&&s.date<=dateAt(6));
+    main.innerHTML=pageHead('给这一周一点方向',`${weekTitle()} · 今天 ${dateLabel(TODAY)}`,button('export-calendar','导出日历',{icon:'download'})+button('upload-timetable','上传课程表',{icon:'image'})+button('add-entry','添加日程',{icon:'plus'})+button('generate','生成周计划',{primary:true,icon:'plus'}))+`
+    <div class="week-summary"><span><strong class="accent">${amount(weekSessions.reduce((n,s)=>n+duration(s),0))}</strong> 已安排</span><span><strong>${weekSessions.filter(s=>s.done).length} / ${weekSessions.length}</strong> 次已完成</span><span><span class="status-dot"></span>预计周负荷 <strong>${loadTone()}</strong></span><span class="day-load-chip" style="--load-color:${dl.level.color}"><i class="status-dot" style="background:${dl.level.color}"></i>今日负荷 <strong>${dl.level.label}</strong></span></div>
     <div class="toolbar"><div class="segmented" aria-label="计划视图">${[['week','周视图'],['month','月历'],['list','每日列表']].map(([id,label])=>`<button data-week-view="${id}" aria-pressed="${weekView===id}">${label}</button>`).join('')}</div><span class="note">${weekView==='week'?'每格按时间顺序排列，并标出当天负荷':weekView==='month'?'完整日历，点任意一天查看当天安排':'选一天，只看这一天的安排'}</span></div>
+    ${weekView==='week'?`<div class="week-nav"><button class="icon-btn round" data-action="week-prev" aria-label="上一周">←</button><div class="week-nav-title"><p class="eyebrow" style="margin:0 0 4px">WEEK</p><strong>${weekTitle()}</strong></div><div class="week-nav-actions">${button('week-today','回到本周')}<button class="icon-btn round" data-action="week-next" aria-label="下一周">→</button></div></div>`:''}
     ${weekView==='week'?weekGridMarkup():weekView==='month'?monthMarkup():dayPickerMarkup()}
-    <p class="note" style="margin-top:22px">先调整「我的节奏」，再生成适合自己的安排。自动安排会留出休息间隔，并列出没有放下的练习。课程、上班等固定安排可以用「添加日程」直接放进来。</p>`;
+    <p class="note" style="margin-top:22px">先调整「我的节奏」，再生成适合自己的安排。自动安排会留出休息间隔，并列出没有放下的练习。课程、上班等固定安排可以用「添加日程」直接放进来，也可以用「上传课程表」一次导入。</p>`;
   }
   // 周视图：每列顶部直接显示当天的日负荷。
   function weekGridMarkup(){
@@ -2599,9 +2654,15 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   function dayPickerMarkup(){
     return `<div class="day-picker" aria-label="选择日期">${DAY_NAMES.map((d,i)=>`<button data-day="${dateAt(i)}" aria-pressed="${selectedDay===dateAt(i)}">${d}<span>${Number(dateAt(i).slice(8))}</span></button>`).join('')}</div><h2 class="agenda-heading">${dateLabel(selectedDay)} · ${DAY_NAMES[weekdayOf(selectedDay)]} · 日负荷 ${dayLoad(selectedDay).level.label}</h2>${sessionList(selectedDay).length?sessionList(selectedDay).map(taskRow).join(''):'<div class="empty"><h3>这一天还没有安排</h3><p>可以休息，也可以在生成计划时调整可用时间。</p></div>'}`;
   }
+  // 时间重叠标记：课程表导入不做阻断，但重叠的安排要在周视图上看得见。
+  function sessionClash(s){
+    const from=minutes(s.start),to=minutes(s.end);
+    if(!(to>from))return false;
+    return state.sessions.some(o=>o.id!==s.id&&o.date===s.date&&minutes(o.start)<to&&from<minutes(o.end));
+  }
   function weekBlock(s){
-    const custom=isCustom(s),li=sessionLoad(s);
-    return `<article class="week-block ${s.done?'done':''} ${custom?'custom':''}" style="--load-color:${li?li.color:'#807499'}" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情"><span class="block-time">${s.start} – ${s.end}${s.done?' · 已完成':''}</span><h3>${e(sessionTitle(s))}</h3></article>`;
+    const custom=isCustom(s),li=sessionLoad(s),clash=sessionClash(s);
+    return `<article class="week-block ${s.done?'done':''} ${custom?'custom':''} ${clash?'clash':''}" style="--load-color:${li?li.color:'#807499'}" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情${clash?'（与当天其他安排时间重叠）':''}"><span class="block-time">${s.start} – ${s.end}${s.done?' · 已完成':''}</span><h3>${e(sessionTitle(s))}</h3></article>`;
   }
   // 推荐参考：把「网站/App/方法」拆成小标签，识别到公开网址时变成可点击链接。
   function refChips(text){
@@ -2780,7 +2841,7 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
   }
   // 在当天可用时段里找第一个不冲突的空档（与其他安排至少隔 10 分钟）。
   function findSlot(date,mins){
-    const idx=dayIndex(date);
+    const idx=weekdayOf(date);
     if(state.availability.restDay.includes(DAY_NAMES[idx]))return null;
     const segs=(idx>=5?state.availability.weekend:state.availability.workday)||[];
     for(const seg of segs){
@@ -3103,6 +3164,148 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     openDialog(custom?'编辑日程':'添加自己的日程',`<form id="entryForm" data-entry="${custom?e(s.id):''}"><div class="dialog-body"><p class="dialog-lead">AI 会结合名称与备注判断类型和每小时负荷，你仍可手动调整。</p><div class="field"><label for="entryTitle">安排名称</label><input id="entryTitle" name="title" maxlength="60" placeholder="例如：高等数学课、产品周会、毕业设计" value="${e(custom?s.title:'')}" required autofocus><p id="entryKindNote" class="category-note entry-kind-note">${custom?`当前类型：${e(kindLabel(s))}。改名会自动重新识别。`:'输入名称后会自动识别类型，并按你的节奏估算这条日程的负荷。'}</p></div><div class="form-pair"><div class="field"><label for="entryKind">类型（自动识别，可调整）</label><select id="entryKind" name="kind">${SCHEDULE_KINDS.map(k=>`<option value="${k.key}" ${custom&&s.kind===k.key?'selected':''}>${k.label}</option>`).join('')}</select></div><div class="field"><label for="entryDate">日期</label><input type="date" id="entryDate" name="date" value="${custom?s.date:selectedDay}" required></div></div><div class="field"><label for="entryEffect">对当天负荷的影响</label><select id="entryEffect" name="effect">${LOAD_EFFECTS.map(o=>`<option value="${o.key}" ${((custom?sessionEffect(s):'auto')===o.key)?'selected':''}>${o.label}</option>`).join('')}</select></div><p id="entryAiHint" class="ai-hint">AI 会结合名称与备注判断类型和对当天负荷的影响。</p><div class="form-pair"><div class="field"><label for="entryStart">开始时间</label><input type="time" id="entryStart" name="start" value="${custom?s.start:'08:00'}" required></div><div class="field"><label for="entryEnd">结束时间</label><input type="time" id="entryEnd" name="end" value="${custom?s.end:'09:00'}" required></div></div><div class="field"><label for="entryNote">备注（可选）</label><textarea id="entryNote" name="note" maxlength="120" placeholder="地点、老师，或者这件事要做到什么程度。">${e(custom?(s.note||''):'')}</textarea></div><div id="entryLoadPreview" class="load-preview"></div><p class="note">这类安排按真实时间填写，不受学习可用时段限制；保存时会检查与当天其他安排是否重叠。</p><p id="entryError" class="field-error" role="alert" hidden></p></div><div class="dialog-footer">${custom?button('ask-delete-entry','删除日程',{id:s.id,className:'danger'}):''}${button('close-dialog','取消')}<button class="btn primary" type="submit">${custom?'保存修改':'加入日历'}</button></div></form>`,'CUSTOM SCHEDULE / 自定义安排');
     paintEntryPreview();updateEntryHints(entryAI);
   }
+  // ===== 课程表图片识别导入 =====
+  // 选图后先用 FileReader 显示缩略图，用户手动点「开始识别」才调用百炼；
+  // 识别结果先进入可编辑的核对列表，确认后才写进周计划。
+  let timetableImage='', timetableBusy=false, timetableSeq=0;
+  const TIMETABLE_MAX_BYTES=10*1024*1024;
+  function openTimetableImport(){
+    timetableImage='';timetableBusy=false;timetableSeq++;
+    openDialog('上传课程表图片',`<div class="dialog-body"><p class="dialog-lead">上传一张课程表截图，AI 会读出课程名称、星期、时间和地点。识别结果会先列出来给你核对，确认后按周次放进日历。</p><input type="file" id="ttFile" class="tt-file" accept="image/*"><div id="ttPreview" class="tt-preview" hidden><img id="ttThumb" alt="课程表预览"><div class="tt-meta"><strong id="ttFileName">已选择图片</strong><p>确认是这张课程表后，再点「开始识别」。</p></div></div><p id="ttError" class="field-error" role="alert" hidden></p></div>`,button('close-dialog','取消')+button('recognize-timetable','开始识别',{primary:true}),'TIMETABLE / 课程表');
+  }
+  function handleTimetableFile(input){
+    const file=input.files&&input.files[0],error=document.getElementById('ttError');
+    const fail=msg=>{if(error){error.textContent=msg;error.hidden=false;}};
+    timetableImage='';
+    if(!file)return;
+    if(!/^image\//.test(file.type)){fail('请选择图片文件。');input.value='';return;}
+    if(file.size>TIMETABLE_MAX_BYTES){fail('图片过大，请压缩或重新截图。');input.value='';return;}
+    if(error){error.hidden=true;error.textContent='';}
+    const seq=++timetableSeq;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      if(seq!==timetableSeq)return;
+      const raw=String(reader.result||'');
+      timetableImage=raw;
+      const box=document.getElementById('ttPreview'),thumb=document.getElementById('ttThumb'),name=document.getElementById('ttFileName');
+      if(thumb)thumb.src=raw;
+      if(box)box.hidden=false;
+      if(name)name.textContent=file.name||'已选择图片';
+      // 先展示原图，后台再压到长边 1600px 的 JPEG，减少请求体积。
+      compressTimetableImage(raw).then(dataUrl=>{if(dataUrl&&seq===timetableSeq)timetableImage=dataUrl;});
+    };
+    reader.onerror=()=>fail('这张图片读取失败，请换一张试试。');
+    reader.readAsDataURL(file);
+  }
+  function compressTimetableImage(dataUrl){
+    return new Promise(resolve=>{
+      const img=new Image();
+      img.onload=()=>{
+        const max=1600,scale=Math.min(1,max/Math.max(img.width||1,img.height||1));
+        const w=Math.max(1,Math.round((img.width||1)*scale)),h=Math.max(1,Math.round((img.height||1)*scale));
+        const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+        const ctx=canvas.getContext('2d');
+        if(!ctx)return resolve(dataUrl);
+        ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);
+        try{resolve(canvas.toDataURL('image/jpeg',0.9));}catch{resolve(dataUrl);}
+      };
+      img.onerror=()=>resolve('');
+      img.src=dataUrl;
+    });
+  }
+  async function recognizeTimetable(){
+    if(timetableBusy)return;
+    const error=document.getElementById('ttError');
+    const fail=msg=>{if(error){error.textContent=msg;error.hidden=false;}};
+    if(!timetableImage){fail('请先选择一张课程表图片。');return;}
+    timetableBusy=true;
+    const seq=++timetableSeq;
+    const btn=document.querySelector('[data-action="recognize-timetable"]'),label=btn?btn.innerHTML:'';
+    if(btn){btn.disabled=true;btn.textContent='识别中…';}
+    if(error){error.hidden=true;error.textContent='';}
+    let timer=null;
+    try{
+      const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('TIMEOUT')),30000);});
+      const request=authClient.functions.invoke('recognize-timetable',{body:{image:timetableImage}});
+      const {data,error:fnError}=await Promise.race([request,timeout]);
+      // 对话框已关闭或换了一张图：直接丢弃这次结果，不影响已有计划。
+      if(seq!==timetableSeq||!modal.open)return;
+      if(fnError)throw new Error(await readFunctionError(fnError));
+      const courses=Array.isArray(data&&data.courses)?data.courses:[];
+      if(!courses.length){fail('未识别到课程，请尝试上传更清晰的图片');return;}
+      renderTimetableReview(courses);
+    }catch(exception){
+      if(seq!==timetableSeq||!modal.open)return;
+      const raw=String((exception&&exception.message)||exception||'');
+      fail(raw==='TIMEOUT'?'识别失败，请检查网络或稍后重试':raw||'识别失败，请检查网络或稍后重试');
+    }finally{
+      clearTimeout(timer);timetableBusy=false;
+      if(btn&&btn.isConnected){btn.disabled=false;btn.innerHTML=label;}
+    }
+  }
+  function timetableRowValue(row,field){return String(row.querySelector(`[data-tt-field="${field}"]`)?.value||'').trim();}
+  function renderTimetableReview(courses){
+    const anchor=semesterStart()||WEEK;
+    const rows=courses.map(course=>{
+      const ws=course.weekStart==null?'':String(course.weekStart),we=course.weekEnd==null?'':String(course.weekEnd);
+      const missing=!ws||!we;
+      return `<div class="tt-row ${missing?'needs-weeks':''}" data-tt-row><input data-tt-field="courseName" value="${e(course.courseName||'')}" placeholder="课程名称" aria-label="课程名称"><select data-tt-field="weekday" aria-label="星期">${DAY_NAMES.map((d,i)=>`<option value="${i+1}" ${Number(course.weekday)===i+1?'selected':''}>${d}</option>`).join('')}</select><input data-tt-field="startTime" type="time" value="${e(course.startTime||'')}" aria-label="开始时间"><input data-tt-field="endTime" type="time" value="${e(course.endTime||'')}" aria-label="结束时间"><input data-tt-field="location" value="${e(course.location||'')}" placeholder="地点（可选）" aria-label="地点"><button class="icon-btn" data-action="remove-timetable-row" aria-label="删除这一行">${icon('close')}</button><div class="tt-row-weeks"><span class="tt-weeks-label">周次</span><label>起始周<input data-tt-field="weekStart" data-tt-week type="number" min="1" max="30" value="${e(ws)}" placeholder="?"></label><label>结束周<input data-tt-field="weekEnd" data-tt-week type="number" min="1" max="30" value="${e(we)}" placeholder="?"></label><label>单双周<select data-tt-field="weekParity">${[['all','全部'],['odd','单周'],['even','双周']].map(([k,l])=>`<option value="${k}" ${(course.weekParity||'all')===k?'selected':''}>${l}</option>`).join('')}</select></label><span class="tt-missing" ${missing?'':'hidden'}>请补充周次范围</span></div></div>`;
+    }).join('');
+    openDialog('核对识别结果',`<div class="dialog-body"><p class="dialog-lead">共识别到 ${courses.length} 门课程。确认课程名、星期、时间、地点和周次后点「全部导入」，会按周次展开到未来多周。</p><div class="tt-anchor"><label for="ttAnchor">第 1 周的周一</label><input type="date" id="ttAnchor" value="${e(anchor)}"><span>课程周次按这个日期推算，下次导入会继续沿用。</span></div><div class="tt-rows">${rows}</div><p id="ttError" class="field-error" role="alert" hidden></p></div>`,button('close-dialog','取消')+button('import-timetable','全部导入',{primary:true}),'TIMETABLE / 课程表',true);
+  }
+  function importTimetable(){
+    const rows=[...document.querySelectorAll('[data-tt-row]')],error=document.getElementById('ttError');
+    const fail=msg=>{if(error){error.textContent=msg;error.hidden=false;}};
+    if(!rows.length){fail('没有可导入的课程。');return;}
+    const anchor=String(document.getElementById('ttAnchor')?.value||'');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(anchor)){fail('请先确认第 1 周的周一日期。');return;}
+    const base=weekStartOf(anchor),batch='tt-'+Date.now().toString(36);
+    const created=[],invalid=[],missing=[],weekHits=[];
+    let courseCount=0,conflicts=0,duplicates=0;
+    rows.forEach((row,index)=>{
+      const courseName=timetableRowValue(row,'courseName'),weekday=Number(timetableRowValue(row,'weekday'))||1;
+      const startTime=timetableRowValue(row,'startTime'),endTime=timetableRowValue(row,'endTime');
+      const location=timetableRowValue(row,'location');
+      if(!courseName||!startTime||!endTime||minutes(endTime)<=minutes(startTime)){invalid.push(index+1);return;}
+      const rawStart=Number(timetableRowValue(row,'weekStart')),rawEnd=Number(timetableRowValue(row,'weekEnd'));
+      if(!Number.isInteger(rawStart)||!Number.isInteger(rawEnd)||rawStart<1||rawEnd<1){missing.push(index+1);return;}
+      const a=Math.min(Math.max(1,rawStart),60),b=Math.min(Math.max(1,rawEnd),60);
+      const start=Math.min(a,b),end=Math.max(a,b),parity=timetableRowValue(row,'weekParity')||'all';
+      const title=courseName.slice(0,40),range=`${start}-${end}周${parity==='odd'?'(单)':parity==='even'?'(双)':''}`,load=titleLoad(title);
+      let scheduled=false;
+      for(let w=start;w<=end;w++){
+        if(parity==='odd'&&w%2===0)continue;
+        if(parity==='even'&&w%2!==1)continue;
+        const date=addDays(base,(w-1)*7+weekday-1);
+        if(state.sessions.some(s=>s.source==='syllabus-import'&&s.title===title&&s.date===date&&s.start===startTime&&s.end===endTime)){duplicates++;continue;}
+        if(state.sessions.some(s=>s.date===date&&minutes(s.start)<minutes(endTime)&&minutes(startTime)<minutes(s.end)))conflicts++;
+        created.push({id:'custom-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),date,start:startTime,end:endTime,title,kind:'class',note:location?`地点：${location}`:'',done:false,effect:load.effect,intensity:load.score,recovery:load.recovery||0,source:'syllabus-import',batch,weekRange:range});
+        weekHits.push(w);scheduled=true;
+      }
+      if(scheduled)courseCount++;
+    });
+    if(invalid.length){fail(`第 ${invalid.join('、')} 行的课程名或时间不完整，补全后再导入。`);return;}
+    if(!created.length){
+      const parts=[];
+      if(missing.length)parts.push(`${missing.length} 条缺周次`);
+      if(duplicates)parts.push(`${duplicates} 条重复`);
+      fail(parts.length?`没有可导入的日程：${parts.join('、')}。`:'没有可导入的日程。');return;
+    }
+    state.sessions.push(...created);
+    state.semesterStart=base;
+    saveState();closeDialog();
+    // 跳到最早一条导入课程所在的周，让用户立刻看到结果。
+    WEEK=weekStartOf(created.map(s=>s.date).sort()[0]);
+    if(page==='week')renderWeek();else location.hash='week';
+    const minW=Math.min(...weekHits),maxW=Math.max(...weekHits);
+    let message=`已导入 ${courseCount} 门课程，共生成 ${created.length} 条周计划日程（覆盖第 ${minW}–${maxW} 周）`;
+    const extras=[];
+    if(duplicates)extras.push(`跳过 ${duplicates} 条重复日程`);
+    if(conflicts)extras.push(`检测到 ${conflicts} 条时间冲突，已在周视图中高亮`);
+    if(missing.length)extras.push(`跳过 ${missing.length} 条未填周次的课程`);
+    if(extras.length)message+='；'+extras.join('；');
+    toast(message,{action:'undo-timetable',label:'撤销',id:batch});
+  }
   // ===== 自定义日程的 AI 分类与负荷 =====
   // 前端先给出本地规则的即时结果，再异步用百炼补上更细的类型与每小时消耗强度。
   let entryAI=null, entryAIKey='', entryAITimer=null, entryAIReq=0, entryAIState='idle', entryKindTouched=false, entryEffectTouched=false;
@@ -3266,6 +3469,16 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     const actions={
       'add-interest':()=>openInterest(), 'edit-interest':()=>openInterest(id),'interest-detail':()=>showInterest(id),
       'add-entry':()=>openEntry(),'edit-entry':()=>openEntry(id),'ask-delete-entry':()=>askDeleteEntry(id),
+      'upload-timetable':()=>openTimetableImport(),'recognize-timetable':()=>recognizeTimetable(),'import-timetable':()=>importTimetable(),
+      'remove-timetable-row':()=>{const row=target.closest('.tt-row');if(row)row.remove();},
+      'undo-timetable':()=>{
+        const n=state.sessions.filter(s=>s.batch===id).length;
+        state.sessions=state.sessions.filter(s=>s.batch!==id);
+        saveState();render();toast(`已撤销本次导入的 ${n} 条日程。`);
+      },
+      'week-prev':()=>{WEEK=addDays(WEEK,-7);renderWeek();},
+      'week-next':()=>{WEEK=addDays(WEEK,7);renderWeek();},
+      'week-today':()=>{WEEK=WEEK_ORIGIN;renderWeek();},
       'month-prev':()=>{calMonth=shiftMonth(calMonth,-1);renderWeek();},
       'month-next':()=>{calMonth=shiftMonth(calMonth,1);renderWeek();},
       'month-today':()=>{calMonth=monthKey(TODAY);selectedDay=TODAY;renderWeek();},
@@ -3307,6 +3520,16 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
     if(event.target.matches('[data-quiz]'))handleQuizChoice(event.target);
     if(event.target.matches('[data-quiz-domain]'))handleQuizDomain(event.target);
     if(event.target.matches('[data-quiz-exp],[data-quiz-int]'))handleQuizMatrix(event.target);
+    if(event.target.matches('#ttFile'))handleTimetableFile(event.target);
+    if(event.target.matches('[data-tt-week]')){
+      const row=event.target.closest('[data-tt-row]');
+      if(row){
+        const missing=!timetableRowValue(row,'weekStart')||!timetableRowValue(row,'weekEnd');
+        row.classList.toggle('needs-weeks',missing);
+        const hint=row.querySelector('.tt-missing');
+        if(hint)hint.hidden=!missing;
+      }
+    }
   });
   // 拖动排序：管理模式下拖拽兴趣行，松手后按新顺序保存。
   document.addEventListener('dragstart',event=>{
