@@ -133,7 +133,9 @@ async function recognize(apiKey: string, image: string) {
   let lastError: Error | null = null;
 
   for (const model of MODEL_LIST) {
-    const response = await fetch(`${DASHSCOPE_BASE}/chat/completions`, {
+    let response: Response;
+    try {
+      response = await fetch(`${DASHSCOPE_BASE}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -151,9 +153,15 @@ async function recognize(apiKey: string, image: string) {
           },
         ],
         temperature: 0,
-        max_tokens: 2000,
+        max_tokens: 4000,
       }),
-    });
+        signal: AbortSignal.timeout(55000),
+      });
+    } catch (error) {
+      console.error(`recognize ${model} request failed: ${String(error)}`);
+      lastError = new Error('识别服务响应超时，请稍后重试。');
+      continue;
+    }
 
     if (response.ok) {
       const data = await response.json();

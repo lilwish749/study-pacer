@@ -2724,6 +2724,8 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     try{
       const response=error&&error.context;
       if(response&&typeof response.json==='function'){const body=await response.json();if(body&&body.error)return String(body.error);}
+      const status=response&&response.status;
+      if(status)return `服务返回 ${status}，请稍后重试。`;
     }catch(_){/* 响应不是 JSON，退回原始信息 */}
     return String((error&&error.message)||error||'');
   }
@@ -3171,7 +3173,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
   const TIMETABLE_MAX_BYTES=10*1024*1024;
   function openTimetableImport(){
     timetableImage='';timetableBusy=false;timetableSeq++;
-    openDialog('上传课程表图片',`<div class="dialog-body"><p class="dialog-lead">上传一张课程表截图，AI 会读出课程名称、星期、时间和地点。识别结果会先列出来给你核对，确认后按周次放进日历。</p><input type="file" id="ttFile" class="tt-file" accept="image/*"><div id="ttPreview" class="tt-preview" hidden><img id="ttThumb" alt="课程表预览"><div class="tt-meta"><strong id="ttFileName">已选择图片</strong><p>确认是这张课程表后，再点「开始识别」。</p></div></div><p id="ttError" class="field-error" role="alert" hidden></p></div>`,button('close-dialog','取消')+button('recognize-timetable','开始识别',{primary:true}),'TIMETABLE / 课程表');
+    openDialog('上传课程表图片',`<div class="dialog-body"><p class="dialog-lead">上传一张课程表截图，AI 会读出课程名称、星期、时间和地点。识别结果会先列出来给你核对，确认后按周次放进日历。</p><input type="file" id="ttFile" class="tt-file" accept="image/*"><div id="ttPreview" class="tt-preview" hidden><img id="ttThumb" alt="课程表预览"><div class="tt-meta"><strong id="ttFileName">已选择图片</strong><p>确认是这张课程表后，再点「开始识别」。</p></div></div><p class="tt-hint">图片内容越清晰，识别越准。</p><p id="ttError" class="field-error" role="alert" hidden></p></div>`,button('close-dialog','取消')+button('recognize-timetable','开始识别',{primary:true}),'TIMETABLE / 课程表');
   }
   function handleTimetableFile(input){
     const file=input.files&&input.files[0],error=document.getElementById('ttError');
@@ -3201,7 +3203,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     return new Promise(resolve=>{
       const img=new Image();
       img.onload=()=>{
-        const max=1600,scale=Math.min(1,max/Math.max(img.width||1,img.height||1));
+        const max=2048,scale=Math.min(1,max/Math.max(img.width||1,img.height||1));
         const w=Math.max(1,Math.round((img.width||1)*scale)),h=Math.max(1,Math.round((img.height||1)*scale));
         const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
         const ctx=canvas.getContext('2d');
@@ -3222,10 +3224,13 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     const seq=++timetableSeq;
     const btn=document.querySelector('[data-action="recognize-timetable"]'),label=btn?btn.innerHTML:'';
     if(btn){btn.disabled=true;btn.textContent='识别中…';}
+    const hint=document.querySelector('.tt-hint'),hintText=hint?hint.textContent:'';
+    if(hint)hint.textContent='正在识别，图片越复杂需要的时间越长，请稍等 10–40 秒。';
     if(error){error.hidden=true;error.textContent='';}
     let timer=null;
     try{
-      const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('TIMEOUT')),30000);});
+      // 视觉模型读整张课表比较慢，给 90 秒；超时前不会误报失败。
+      const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('TIMEOUT')),90000);});
       const request=authClient.functions.invoke('recognize-timetable',{body:{image:timetableImage}});
       const {data,error:fnError}=await Promise.race([request,timeout]);
       // 对话框已关闭或换了一张图：直接丢弃这次结果，不影响已有计划。
@@ -3240,6 +3245,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
       fail(raw==='TIMEOUT'?'识别失败，请检查网络或稍后重试':raw||'识别失败，请检查网络或稍后重试');
     }finally{
       clearTimeout(timer);timetableBusy=false;
+      if(hint&&hint.isConnected)hint.textContent=hintText;
       if(btn&&btn.isConnected){btn.disabled=false;btn.innerHTML=label;}
     }
   }
