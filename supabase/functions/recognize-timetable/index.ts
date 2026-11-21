@@ -3,6 +3,8 @@
 // 让它按固定结构返回课程列表。密钥只从服务端环境变量读取，绝不下发到前端。
 
 const DASHSCOPE_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+// 国际站：如果密钥是在国际站创建的，国内站会返回 403 Access denied，这时切到国际站再试一次。
+const DASHSCOPE_INTL_BASE = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
 
 // 视觉模型：优先 qwen-vl-plus，未开通时依次回退到其他已开通的 qwen-vl 系列。
 const MODELS = (Deno.env.get('DASHSCOPE_VL_MODEL') || 'qwen-vl-plus')
@@ -251,12 +253,7 @@ async function verifyConflicts(apiKey: string, image: string, periodImage: strin
   });
   for (const model of MODEL_LIST.slice(0, 2)) {
     try {
-      const response = await fetch(`${DASHSCOPE_BASE}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, messages: [{ role: 'user', content }], temperature: 0, max_tokens: 1200 }),
-        signal: AbortSignal.timeout(35000),
-      });
+      const response = await postChat(apiKey, model, content, 1200, 35000);
       if (!response.ok) {
         console.error(`verify ${model} ${response.status}`);
         continue;
@@ -279,6 +276,23 @@ async function verifyConflicts(apiKey: string, image: string, periodImage: strin
   return [] as Array<Record<string, unknown>>;
 }
 
+// 统一发请求：国内站被 403 拒绝时，自动换国际站再试，兼容国际站创建的密钥。
+async function postChat(apiKey: string, model: string, content: Array<Record<string, unknown>>, maxTokens: number, timeoutMs: number) {
+  const bases = [DASHSCOPE_BASE, DASHSCOPE_INTL_BASE];
+  let lastResponse: Response | null = null;
+  for (const base of bases) {
+    const response = await fetch(`${base}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content }], temperature: 0, max_tokens: maxTokens }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.status === 403) { lastResponse = response; continue; }
+    return response;
+  }
+  return lastResponse as Response;
+}
+
 async function recognize(apiKey: string, image: string, periods: string, periodImage: string) {
   let lastError: Error | null = null;
   const content: Array<Record<string, unknown>> = [{ type: 'image_url', image_url: { url: image } }];
@@ -291,25 +305,7 @@ async function recognize(apiKey: string, image: string, periods: string, periodI
   for (const model of MODEL_LIST) {
     let response: Response;
     try {
-      response = await fetch(`${DASHSCOPE_BASE}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'user',
-            content,
-          },
-        ],
-        temperature: 0,
-        max_tokens: 4000,
-      }),
-        signal: AbortSignal.timeout(45000),
-      });
+      response = await postChat(apiKey, model, content, 4000, 45000);
     } catch (error) {
       console.error(`recognize ${model} request failed: ${String(error)}`);
       lastError = new Error('识别服务响应超时，请稍后重试。');
@@ -369,7 +365,11 @@ async function recognize(apiKey: string, image: string, periods: string, periodI
         return detail.replace(/\s+/g, ' ').slice(0, 90);
       }
     })();
-    if ([400, 403, 404, 429].includes(response.status) || response.status >= 500) {
+    if (response.status === 403) {
+      lastError = new Error('百炼拒绝访问（HTTP 403）：密钥没有该模型的权限，或账号未开通模型、欠费、未实名。请到百炼控制台确认已开通 qwen-vl-plus 且账户可用。');
+      continue;
+    }
+    if ([400, 404, 429].includes(response.status) || response.status >= 500) {
       lastError = new Error(`识别服务暂时不可用（HTTP ${response.status}${reason ? '：' + reason : ''}）。`);
       continue;
     }
