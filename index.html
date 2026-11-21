@@ -3238,13 +3238,13 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     return new Promise(resolve=>{
       const img=new Image();
       img.onload=()=>{
-        const max=2048,scale=Math.min(1,max/Math.max(img.width||1,img.height||1));
+        const max=1500,scale=Math.min(1,max/Math.max(img.width||1,img.height||1));
         const w=Math.max(1,Math.round((img.width||1)*scale)),h=Math.max(1,Math.round((img.height||1)*scale));
         const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
         const ctx=canvas.getContext('2d');
         if(!ctx)return resolve(dataUrl);
         ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);
-        try{resolve(canvas.toDataURL('image/jpeg',0.9));}catch{resolve(dataUrl);}
+        try{resolve(canvas.toDataURL('image/jpeg',0.85));}catch{resolve(dataUrl);}
       };
       img.onerror=()=>resolve('');
       img.src=dataUrl;

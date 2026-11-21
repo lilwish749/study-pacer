@@ -253,7 +253,7 @@ async function verifyConflicts(apiKey: string, image: string, periodImage: strin
   });
   for (const model of MODEL_LIST.slice(0, 2)) {
     try {
-      const response = await postChat(apiKey, model, content, 1200, 35000);
+      const response = await postChat(apiKey, model, content, 1200, 30000);
       if (!response.ok) {
         console.error(`verify ${model} ${response.status}`);
         continue;
@@ -302,10 +302,18 @@ async function recognize(apiKey: string, image: string, periods: string, periodI
   }
   content.push({ type: 'text', text: buildPrompt(periods) });
 
-  for (const model of MODEL_LIST) {
+  // 边缘函数有 150 秒硬上限（超时会返回 546），这里留出余量，超时就主动收尾。
+  const deadline = Date.now() + 105000;
+
+  for (const model of MODEL_LIST.slice(0, 3)) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs < 8000) {
+      lastError = lastError || new Error('识别超时了，请稍后重试或换一张更小的图片。');
+      break;
+    }
     let response: Response;
     try {
-      response = await postChat(apiKey, model, content, 4000, 45000);
+      response = await postChat(apiKey, model, content, 4000, Math.min(45000, remainingMs));
     } catch (error) {
       console.error(`recognize ${model} request failed: ${String(error)}`);
       lastError = new Error('识别服务响应超时，请稍后重试。');
@@ -322,7 +330,7 @@ async function recognize(apiKey: string, image: string, periods: string, periodI
         const detected = detectConflicts(courses);
         let fixed = 0;
         // 一发现同一天时间重叠，就带原图再核对一次，判断是识别错误还是课表本身重叠。
-        if (detected.length && detected.length <= 12) {
+        if (detected.length && detected.length <= 12 && deadline - Date.now() > 40000) {
           const names = new Set<string>();
           detected.forEach(c => { names.add(c.a); names.add(c.b); });
           const suspects = courses.filter(c => names.has(String(c.courseName)));
