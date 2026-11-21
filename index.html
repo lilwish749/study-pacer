@@ -311,7 +311,28 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
 .week-block.clash{border-left-color:var(--warning);background:#201d16;box-shadow:inset 0 0 0 1px rgb(230 195 124 / 40%)}
 .week-block.clash:hover{background:#26221a}
 .week-block.clash .block-time:after{content:' · 时间重叠';color:var(--warning)}
-@media(max-width:760px){.tt-row{grid-template-columns:1fr 1fr}.tt-row [data-tt-field="courseName"],.tt-row [data-tt-field="location"]{grid-column:1 / -1}.tt-row .icon-btn{justify-self:end}.tt-preview{flex-direction:column;align-items:flex-start}.tt-preview img{max-width:100%;max-height:180px}}
+/* 负荷等级：轻量=浅色填充+虚线边框+无竖条；高负荷=实心深色+3px 竖条。不用红绿语义色。 */
+.week-block.heavy{background:#3b3457;border-left:3px solid #8c78e6}
+.week-block.heavy:hover{background:#463e66}
+.week-block.light{background:rgb(184 166 248 / 8%);border:1px dashed rgb(184 166 248 / 55%)}
+.week-block.light:hover{background:rgb(184 166 248 / 15%)}
+.week-block.light h3,.week-block.light .block-time{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.week-block.light.clash{border-color:rgb(230 195 124 / 55%);background:rgb(230 195 124 / 10%)}
+.week-block.heavy.clash{background:#332b1f;border-left-color:var(--warning)}
+.load-gap{height:0;border-top:1px dashed rgb(184 166 248 / 30%);margin:0 2px 11px}
+.heavy-day-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:6px;vertical-align:middle;opacity:.9}
+.load-choice{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.load-option{position:relative;display:block;padding:12px 13px;border-radius:10px;cursor:pointer;transition:box-shadow .18s var(--ease),background-color .18s var(--ease)}
+.load-option input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.load-option b{display:block;font-size:13px;font-weight:600}
+.load-option small{display:block;font-size:11px;color:var(--muted);line-height:1.65;margin-top:3px}
+.load-option.light{border:1px dashed rgb(184 166 248 / 55%);background:rgb(184 166 248 / 8%)}
+.load-option.heavy{border:1px solid #3b3457;border-left:3px solid #8c78e6;background:#3b3457}
+.load-option:hover{background-color:rgb(184 166 248 / 14%)}
+.load-option.heavy:hover{background-color:#463e66}
+.load-option:has(input:checked){box-shadow:0 0 0 2px var(--accent)}
+.load-option:has(input:focus-visible){box-shadow:0 0 0 2px var(--accent),0 0 0 4px rgb(184 166 248 / 25%)}
+@media(max-width:760px){.load-choice{grid-template-columns:1fr}.tt-row{grid-template-columns:1fr 1fr}.tt-row [data-tt-field="courseName"],.tt-row [data-tt-field="location"]{grid-column:1 / -1}.tt-row .icon-btn{justify-self:end}.tt-preview{flex-direction:column;align-items:flex-start}.tt-preview img{max-width:100%;max-height:180px}}
 dialog.wide{width:min(920px,calc(100vw - 32px))}
 .toast-action{border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer;margin-left:4px}
 .toast-action:hover{background:rgb(184 166 248 / 14%)}
@@ -2010,12 +2031,12 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     person:{baseline:52,channel:{read:.25,audiovisual:.35,hands:.35,social:.05},block:45,stuck:'search',peakTime:'night',structureNeed:.6,openLoop:.4,socialPref:.1,recovery:.8,weeklyHours:8,domains:{coding:{experience:.5,interest:.85},language:{experience:.3,interest:.8},design:{experience:.4,interest:.85},music:{experience:.3,interest:.7}},calibration:{k:1,b:2},stateIndex:.6,answered:{baseline:true,channel:true,pace:true,structure:true,social:true,domains:true}},
     interests:SAMPLE_ACTIVITIES.filter(a=>SAMPLE_DETAILS[a.id]).map(a=>({...a,...SAMPLE_DETAILS[a.id],categoryLabel:InterestClassifier.byKey(a.domain)?.label || '兴趣',cards:SAMPLE_DETAILS[a.id].cards.map((c,i)=>({...c,step:i+1}))})),
     sessions:[
-      {id:'s1',date:WEEK,start:'07:30',end:'07:55',interestId:'duolingo-japanese',done:true},
-      {id:'s2',date:WEEK,start:'20:00',end:'20:55',interestId:'python-data-video',done:false},
-      {id:'s3',date:'2026-10-28',start:'20:00',end:'20:45',interestId:'sketch-copy',done:false},
-      {id:'s4',date:'2026-10-29',start:'20:00',end:'20:55',interestId:'python-data-video',done:false},
-      {id:'s5',date:'2026-10-30',start:'07:30',end:'07:55',interestId:'duolingo-japanese',done:false},
-      {id:'s6',date:'2026-10-31',start:'14:00',end:'14:45',interestId:'sketch-copy',done:false}
+      {id:'s1',date:WEEK,start:'07:30',end:'07:55',interestId:'duolingo-japanese',done:true,loadLevel:'light'},
+      {id:'s2',date:WEEK,start:'20:00',end:'20:55',interestId:'python-data-video',done:false,loadLevel:'heavy'},
+      {id:'s3',date:'2026-10-28',start:'20:00',end:'20:45',interestId:'sketch-copy',done:false,loadLevel:'heavy'},
+      {id:'s4',date:'2026-10-29',start:'20:00',end:'20:55',interestId:'python-data-video',done:false,loadLevel:'heavy'},
+      {id:'s5',date:'2026-10-30',start:'07:30',end:'07:55',interestId:'duolingo-japanese',done:false,loadLevel:'light'},
+      {id:'s6',date:'2026-10-31',start:'14:00',end:'14:45',interestId:'sketch-copy',done:false,loadLevel:'heavy'}
     ],
     availability:{workday:[{start:'07:00',end:'08:00'},{start:'19:00',end:'22:00'}],weekend:[{start:'09:00',end:'12:00'},{start:'14:00',end:'21:00'}],restDay:['周日']}
   });
@@ -2314,6 +2335,27 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     const cap=dailyCapacityHours();
     const pct=Math.round(effort/cap*1000)/10;
     return {percent:pct,level:LMS.levelOfPercent(pct),minutes};
+  }
+  // 负荷等级（loadLevel）是持久化字段：light=轻量小日程，heavy=高负荷日程。
+  // 旧数据缺失或值非法时按 heavy 处理，只在控制台警告一次，不静默写回。
+  const HEAVY_DAY_LIMIT_MIN=360;
+  let loadLevelWarned=false;
+  function loadLevelOf(s){
+    const v=s&&s.loadLevel;
+    if(v==='light'||v==='heavy')return v;
+    if(!loadLevelWarned){
+      loadLevelWarned=true;
+      console.warn('[study-pacer] 有日程缺少合法的 loadLevel，已按 heavy 渲染。');
+    }
+    return 'heavy';
+  }
+  function weekLoadSplit(){
+    const list=state.sessions.filter(s=>s.date>=WEEK&&s.date<=dateAt(6));
+    const heavyMinutes=list.filter(s=>loadLevelOf(s)==='heavy').reduce((n,s)=>n+duration(s),0);
+    return {hours:Math.round(heavyMinutes/6)/10,light:list.filter(s=>loadLevelOf(s)==='light').length};
+  }
+  function dayHeavyMinutes(date){
+    return sessionList(date).filter(s=>loadLevelOf(s)==='heavy').reduce((n,s)=>n+duration(s),0);
   }
   // 负荷五档：1 很轻松 → 5 太吃力。每档给出颜色与一句人话说明。
   const LOAD_GRADES=[
@@ -2639,8 +2681,9 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
   function renderWeek(){
     const dl=dayLoad(TODAY);
     const weekSessions=state.sessions.filter(s=>s.date>=WEEK&&s.date<=dateAt(6));
+    const split=weekLoadSplit();
     main.innerHTML=pageHead('给这一周一点方向',`${weekTitle()} · 今天 ${dateLabel(TODAY)}`,button('export-calendar','导出日历',{icon:'download'})+button('upload-timetable','上传课程表',{icon:'image'})+(timetableImportCount()?button('clear-timetable-imports',`清除导入 ${timetableImportCount()}`,{}):'')+button('add-entry','添加日程',{icon:'plus'})+button('generate','生成周计划',{primary:true,icon:'plus'}))+`
-    <div class="week-summary"><span><strong class="accent">${amount(weekSessions.reduce((n,s)=>n+duration(s),0))}</strong> 已安排</span><span><strong>${weekSessions.filter(s=>s.done).length} / ${weekSessions.length}</strong> 次已完成</span><span><span class="status-dot"></span>预计周负荷 <strong>${loadTone()}</strong></span><span class="day-load-chip" style="--load-color:${dl.level.color}"><i class="status-dot" style="background:${dl.level.color}"></i>今日负荷 <strong>${dl.level.label}</strong></span></div>
+    <div class="week-summary"><span><strong class="accent">${amount(weekSessions.reduce((n,s)=>n+duration(s),0))}</strong> 已安排</span><span><strong>${weekSessions.filter(s=>s.done).length} / ${weekSessions.length}</strong> 次已完成</span><span class="week-load-split">本周高负荷 <strong>${split.hours} 小时</strong> · 轻量 <strong>${split.light} 项</strong></span><span><span class="status-dot"></span>预计周负荷 <strong>${loadTone()}</strong></span><span class="day-load-chip" style="--load-color:${dl.level.color}"><i class="status-dot" style="background:${dl.level.color}"></i>今日负荷 <strong>${dl.level.label}</strong></span></div>
     <div class="toolbar"><div class="segmented" aria-label="计划视图">${[['week','周视图'],['month','月历'],['list','每日列表']].map(([id,label])=>`<button data-week-view="${id}" aria-pressed="${weekView===id}">${label}</button>`).join('')}</div><span class="note">${weekView==='week'?'每格按时间顺序排列，并标出当天负荷':weekView==='month'?'完整日历，点任意一天查看当天安排':'选一天，只看这一天的安排'}</span></div>
     ${weekView==='week'?`<div class="week-nav"><button class="icon-btn round" data-action="week-prev" aria-label="上一周">←</button><div class="week-nav-title"><p class="eyebrow" style="margin:0 0 4px">WEEK</p><strong>${weekTitle()}</strong></div><div class="week-nav-actions">${button('week-today','回到本周')}<button class="icon-btn round" data-action="week-next" aria-label="下一周">→</button></div></div>`:''}
     ${weekView==='week'?weekGridMarkup():weekView==='month'?monthMarkup():dayPickerMarkup()}
@@ -2648,7 +2691,22 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
   }
   // 周视图：每列顶部直接显示当天的日负荷。
   function weekGridMarkup(){
-    return `<section class="week-grid" aria-label="七天计划">${DAY_NAMES.map((d,i)=>{const date=dateAt(i),dl=dayLoad(date);return `<div class="day-column ${date===TODAY?'today':''}"><div class="day-heading"><span>${d}<i class="day-load" style="--load-color:${dl.level.color}" title="日负荷 ${dl.level.label}">${dl.level.label}</i></span><strong>${Number(date.slice(8))}</strong></div><div class="day-items">${sessionList(date).map(weekBlock).join('')||`<p class="day-rest">${i===6?'给自己留白<br>今天休息':'还没有安排<br>可以慢慢来'}</p>`}</div></div>`;}).join('')}</section>`;
+    return `<section class="week-grid" aria-label="七天计划">${DAY_NAMES.map((d,i)=>{
+      const date=dateAt(i),dl=dayLoad(date),heavyDay=dayHeavyMinutes(date)>HEAVY_DAY_LIMIT_MIN;
+      return `<div class="day-column ${date===TODAY?'today':''}"><div class="day-heading"><span>${d}<i class="day-load" style="--load-color:${dl.level.color}" title="日负荷 ${dl.level.label}">${dl.level.label}</i></span><strong>${Number(date.slice(8))}${heavyDay?'<i class="heavy-day-dot" title="高负荷日，注意留白" aria-label="高负荷日，注意留白"></i>':''}</strong></div><div class="day-items">${dayBlocksMarkup(date)||`<p class="day-rest">${i===6?'给自己留白<br>今天休息':'还没有安排<br>可以慢慢来'}</p>`}</div></div>`;
+    }).join('')}</section>`;
+  }
+  // 同一天内轻重日程相邻（间隔 <30 分钟）时插一条细分隔线；时间顺序仍然优先。
+  function dayBlocksMarkup(date){
+    let html='',prev=null;
+    sessionList(date).forEach(s=>{
+      if(prev&&loadLevelOf(prev)!==loadLevelOf(s)){
+        const gap=minutes(s.start)-minutes(prev.end);
+        if(gap>=0&&gap<30)html+='<div class="load-gap" aria-hidden="true"></div>';
+      }
+      html+=weekBlock(s);prev=s;
+    });
+    return html;
   }
   // 月历：完整一个月的格子，每格带当天负荷条；点格子看当天安排。
   function monthMarkup(){
@@ -2674,8 +2732,9 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     return state.sessions.some(o=>o.id!==s.id&&o.date===s.date&&minutes(o.start)<to&&from<minutes(o.end));
   }
   function weekBlock(s){
-    const custom=isCustom(s),li=sessionLoad(s),clash=sessionClash(s);
-    return `<article class="week-block ${s.done?'done':''} ${custom?'custom':''} ${clash?'clash':''}" style="--load-color:${li?li.color:'#807499'}" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情${clash?'（与当天其他安排时间重叠）':''}"><span class="block-time">${s.start} – ${s.end}${s.done?' · 已完成':''}</span><h3>${e(sessionTitle(s))}</h3></article>`;
+    const custom=isCustom(s),li=sessionLoad(s),clash=sessionClash(s),heavy=loadLevelOf(s)==='heavy';
+    const dur=duration(s),timeText=heavy&&dur>=60?`${s.start} – ${s.end} · ${dur} 分钟`:`${s.start} – ${s.end}`;
+    return `<article class="week-block ${heavy?'heavy':'light'} ${s.done?'done':''} ${custom?'custom':''} ${clash?'clash':''}" style="--load-color:${li?li.color:'#807499'}" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情${clash?'（与当天其他安排时间重叠）':''}"><span class="block-time">${timeText}${s.done?' · 已完成':''}</span><h3>${e(sessionTitle(s))}</h3></article>`;
   }
   // 推荐参考：把「网站/App/方法」拆成小标签，识别到公开网址时变成可点击链接。
   function refChips(text){
@@ -2885,7 +2944,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
       if(dayTotal+d.minutes>240){skipped++;return;}
       const slot=findSlot(date,d.minutes);
       if(!slot){skipped++;return;}
-      state.sessions.push({id:`ai-${date}-${id}`,date,start:slot.start,end:slot.end,interestId:id,done:false,title:d.title,detail:d.detail});
+      state.sessions.push({id:`ai-${date}-${id}`,date,start:slot.start,end:slot.end,interestId:id,done:false,title:d.title,detail:d.detail,loadLevel:d.minutes>=45?'heavy':'light'});
       added++;
     });
     saveState();closeDialog();
@@ -3176,7 +3235,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     entryAIState=entryAI?'done':'idle';
     entryKindTouched=false;
     entryEffectTouched=false;
-    openDialog(custom?'编辑日程':'添加自己的日程',`<form id="entryForm" data-entry="${custom?e(s.id):''}"><div class="dialog-body"><p class="dialog-lead">AI 会结合名称与备注判断类型和每小时负荷，你仍可手动调整。</p><div class="field"><label for="entryTitle">安排名称</label><input id="entryTitle" name="title" maxlength="60" placeholder="例如：高等数学课、产品周会、毕业设计" value="${e(custom?s.title:'')}" required autofocus><p id="entryKindNote" class="category-note entry-kind-note">${custom?`当前类型：${e(kindLabel(s))}。改名会自动重新识别。`:'输入名称后会自动识别类型，并按你的节奏估算这条日程的负荷。'}</p></div><div class="form-pair"><div class="field"><label for="entryKind">类型（自动识别，可调整）</label><select id="entryKind" name="kind">${SCHEDULE_KINDS.map(k=>`<option value="${k.key}" ${custom&&s.kind===k.key?'selected':''}>${k.label}</option>`).join('')}</select></div><div class="field"><label for="entryDate">日期</label><input type="date" id="entryDate" name="date" value="${custom?s.date:selectedDay}" required></div></div><div class="field"><label for="entryEffect">对当天负荷的影响</label><select id="entryEffect" name="effect">${LOAD_EFFECTS.map(o=>`<option value="${o.key}" ${((custom?sessionEffect(s):'auto')===o.key)?'selected':''}>${o.label}</option>`).join('')}</select></div><p id="entryAiHint" class="ai-hint">AI 会结合名称与备注判断类型和对当天负荷的影响。</p><div class="form-pair"><div class="field"><label for="entryStart">开始时间</label><input type="time" id="entryStart" name="start" value="${custom?s.start:'08:00'}" required></div><div class="field"><label for="entryEnd">结束时间</label><input type="time" id="entryEnd" name="end" value="${custom?s.end:'09:00'}" required></div></div><div class="field"><label for="entryNote">备注（可选）</label><textarea id="entryNote" name="note" maxlength="120" placeholder="地点、老师，或者这件事要做到什么程度。">${e(custom?(s.note||''):'')}</textarea></div><div id="entryLoadPreview" class="load-preview"></div><p class="note">这类安排按真实时间填写，不受学习可用时段限制；保存时会检查与当天其他安排是否重叠。</p><p id="entryError" class="field-error" role="alert" hidden></p></div><div class="dialog-footer">${custom?button('ask-delete-entry','删除日程',{id:s.id,className:'danger'}):''}${button('close-dialog','取消')}<button class="btn primary" type="submit">${custom?'保存修改':'加入日历'}</button></div></form>`,'CUSTOM SCHEDULE / 自定义安排');
+    openDialog(custom?'编辑日程':'添加自己的日程',`<form id="entryForm" data-entry="${custom?e(s.id):''}"><div class="dialog-body"><p class="dialog-lead">AI 会结合名称与备注判断类型和每小时负荷，你仍可手动调整。</p><div class="field"><label for="entryTitle">安排名称</label><input id="entryTitle" name="title" maxlength="60" placeholder="例如：高等数学课、产品周会、毕业设计" value="${e(custom?s.title:'')}" required autofocus><p id="entryKindNote" class="category-note entry-kind-note">${custom?`当前类型：${e(kindLabel(s))}。改名会自动重新识别。`:'输入名称后会自动识别类型，并按你的节奏估算这条日程的负荷。'}</p></div><div class="form-pair"><div class="field"><label for="entryKind">类型（自动识别，可调整）</label><select id="entryKind" name="kind">${SCHEDULE_KINDS.map(k=>`<option value="${k.key}" ${custom&&s.kind===k.key?'selected':''}>${k.label}</option>`).join('')}</select></div><div class="field"><label for="entryDate">日期</label><input type="date" id="entryDate" name="date" value="${custom?s.date:selectedDay}" required></div></div><div class="field"><label for="entryEffect">对当天负荷的影响</label><select id="entryEffect" name="effect">${LOAD_EFFECTS.map(o=>`<option value="${o.key}" ${((custom?sessionEffect(s):'auto')===o.key)?'selected':''}>${o.label}</option>`).join('')}</select></div><p id="entryAiHint" class="ai-hint">AI 会结合名称与备注判断类型和对当天负荷的影响。</p><div class="field"><label>负荷等级（必选）</label><div class="load-choice" role="radiogroup" aria-label="负荷等级"><label class="load-option light"><input type="radio" name="loadLevel" value="light" ${custom&&loadLevelOf(s)==='light'?'checked':''} required><span><b>轻量 · 不增加负荷</b><small>15–30 分钟内可完成，不挤占深度学习时间</small></span></label><label class="load-option heavy"><input type="radio" name="loadLevel" value="heavy" ${custom&&loadLevelOf(s)==='heavy'?'checked':''} required><span><b>高负荷 · 需要大块时间</b><small>需要连续 45 分钟以上，占用认知资源</small></span></label></div><p class="category-note">轻量用浅色虚线块，高负荷用实心深色块并带左侧竖条。</p></div><div class="form-pair"><div class="field"><label for="entryStart">开始时间</label><input type="time" id="entryStart" name="start" value="${custom?s.start:'08:00'}" required></div><div class="field"><label for="entryEnd">结束时间</label><input type="time" id="entryEnd" name="end" value="${custom?s.end:'09:00'}" required></div></div><div class="field"><label for="entryNote">备注（可选）</label><textarea id="entryNote" name="note" maxlength="120" placeholder="地点、老师，或者这件事要做到什么程度。">${e(custom?(s.note||''):'')}</textarea></div><div id="entryLoadPreview" class="load-preview"></div><p class="note">这类安排按真实时间填写，不受学习可用时段限制；保存时会检查与当天其他安排是否重叠。</p><p id="entryError" class="field-error" role="alert" hidden></p></div><div class="dialog-footer">${custom?button('ask-delete-entry','删除日程',{id:s.id,className:'danger'}):''}${button('close-dialog','取消')}<button class="btn primary" type="submit">${custom?'保存修改':'加入日历'}</button></div></form>`,'CUSTOM SCHEDULE / 自定义安排');
     paintEntryPreview();updateEntryHints(entryAI);
   }
   // ===== 课程表图片识别导入 =====
@@ -3313,7 +3372,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     const rows=courses.map(course=>{
       const ranges=weekSegmentsText(course.weekSegments);
       const missing=!ranges,badTime=!course.startTime||!course.endTime;
-      return `<div class="tt-row ${missing?'needs-weeks':''} ${badTime?'needs-time':''} ${clash.has(course.courseName)?'needs-check':''}" data-tt-row><input data-tt-field="courseName" value="${e(course.courseName||'')}" placeholder="课程名称" aria-label="课程名称"><select data-tt-field="weekday" aria-label="星期">${DAY_NAMES.map((d,i)=>`<option value="${i+1}" ${Number(course.weekday)===i+1?'selected':''}>${d}</option>`).join('')}</select><input data-tt-field="startTime" type="time" value="${e(course.startTime||'')}" aria-label="开始时间"><input data-tt-field="endTime" type="time" value="${e(course.endTime||'')}" aria-label="结束时间"><input data-tt-field="location" value="${e(course.location||'')}" placeholder="地点（可选）" aria-label="地点"><button class="icon-btn" data-action="remove-timetable-row" aria-label="删除这一行">${icon('close')}</button><div class="tt-row-weeks"><span class="tt-weeks-label">周次</span><label class="tt-weeks-input">上课周次<input data-tt-field="weekRanges" data-tt-week value="${e(ranges)}" maxlength="60" placeholder="如 3-8,10-16；单双周写 1-16(单)"></label><span class="tt-weeks-tip">断开就写多段，中间空过的周不会排课</span>${course.periodStart?`<span class="tt-weeks-tip">识别为${e(course.periodText||('第'+course.periodStart+'-'+(course.periodEnd||course.periodStart)+'节'))}</span>`:''}${clash.has(course.courseName)?'<span class="tt-missing tt-clash-tip">再次核对原图后仍与其他课重叠，请手动确认</span>':''}<span class="tt-missing" ${missing?'':'hidden'}>请补充周次范围</span><span class="tt-missing" ${badTime?'':'hidden'} data-tt-time-missing>请补充上课时间</span></div></div>`;
+      return `<div class="tt-row ${missing?'needs-weeks':''} ${badTime?'needs-time':''} ${clash.has(course.courseName)?'needs-check':''}" data-tt-row><input data-tt-field="courseName" value="${e(course.courseName||'')}" placeholder="课程名称" aria-label="课程名称"><select data-tt-field="weekday" aria-label="星期">${DAY_NAMES.map((d,i)=>`<option value="${i+1}" ${Number(course.weekday)===i+1?'selected':''}>${d}</option>`).join('')}</select><input data-tt-field="startTime" type="time" value="${e(course.startTime||'')}" aria-label="开始时间"><input data-tt-field="endTime" type="time" value="${e(course.endTime||'')}" aria-label="结束时间"><input data-tt-field="location" value="${e(course.location||'')}" placeholder="地点（可选）" aria-label="地点"><button class="icon-btn" data-action="remove-timetable-row" aria-label="删除这一行">${icon('close')}</button><div class="tt-row-weeks"><span class="tt-weeks-label">周次</span><label class="tt-weeks-input">上课周次<input data-tt-field="weekRanges" data-tt-week value="${e(ranges)}" maxlength="60" placeholder="如 3-8,10-16；单双周写 1-16(单)"></label><span class="tt-weeks-tip">断开就写多段，中间空过的周不会排课</span><label class="tt-load"><span>负荷</span><select data-tt-field="loadLevel" aria-label="负荷等级"><option value="heavy">高负荷</option><option value="light">轻量</option></select></label>${course.periodStart?`<span class="tt-weeks-tip">识别为${e(course.periodText||('第'+course.periodStart+'-'+(course.periodEnd||course.periodStart)+'节'))}</span>`:''}${clash.has(course.courseName)?'<span class="tt-missing tt-clash-tip">再次核对原图后仍与其他课重叠，请手动确认</span>':''}<span class="tt-missing" ${missing?'':'hidden'}>请补充周次范围</span><span class="tt-missing" ${badTime?'':'hidden'} data-tt-time-missing>请补充上课时间</span></div></div>`;
     }).join('');
     const checkNote=report&&report.detected?`<p class="dialog-lead tt-check-note">检测到 ${report.detected} 处同一天时间重叠，已带原图重新核对，修正了 ${report.fixed} 处${report.remaining&&report.remaining.length?`，仍有 ${report.remaining.length} 处属于课表本身重叠（已标黄，请手动确认）`:'，现在已无重叠'}。</p>`:'';
     openDialog('核对识别结果',`<div class="dialog-body"><p class="dialog-lead">共识别到 ${courses.length} 门课程。确认课程名、星期、时间、地点和周次后点「全部导入」，会按周次展开到未来多周。标黄的行表示缺少时间、周次或仍存在重叠，需要你先确认。</p>${checkNote}<div class="tt-anchor"><label for="ttAnchor">第 1 周的周一</label><input type="date" id="ttAnchor" value="${e(anchor)}"><span>课程周次按这个日期推算，下次导入会继续沿用。</span></div><div class="tt-rows">${rows}</div><p id="ttError" class="field-error" role="alert" hidden></p></div>`,button('close-dialog','取消')+button('import-timetable','全部导入',{primary:true}),'TIMETABLE / 课程表',true);
@@ -3331,6 +3390,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
       const courseName=timetableRowValue(row,'courseName'),weekday=Number(timetableRowValue(row,'weekday'))||1;
       const startTime=timetableRowValue(row,'startTime'),endTime=timetableRowValue(row,'endTime');
       const location=timetableRowValue(row,'location');
+      const loadLevel=timetableRowValue(row,'loadLevel')==='light'?'light':'heavy';
       if(!courseName||!startTime||!endTime||minutes(endTime)<=minutes(startTime)){invalid.push(index+1);return;}
       const segments=parseWeekSegments(timetableRowValue(row,'weekRanges'));
       if(!segments.length){missing.push(index+1);return;}
@@ -3344,7 +3404,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
         const date=addDays(base,(w-1)*7+weekday-1);
         if(state.sessions.some(s=>s.source==='syllabus-import'&&s.title===title&&s.date===date&&s.start===startTime&&s.end===endTime)){duplicates++;continue;}
         if(state.sessions.some(s=>s.date===date&&minutes(s.start)<minutes(endTime)&&minutes(startTime)<minutes(s.end)))conflicts++;
-        created.push({id:'custom-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),date,start:startTime,end:endTime,title,kind:'class',note:location?`地点：${location}`:'',done:false,effect:load.effect,intensity:load.score,recovery:load.recovery||0,source:'syllabus-import',batch,weekRange:range});
+        created.push({id:'custom-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),date,start:startTime,end:endTime,title,kind:'class',note:location?`地点：${location}`:'',done:false,effect:load.effect,intensity:load.score,recovery:load.recovery||0,loadLevel,source:'syllabus-import',batch,weekRange:range});
         weekHits.push(w);scheduled=true;
       }
       });
@@ -3494,7 +3554,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     const items=[];let skipped=0;
     tt.days.forEach(day=>day.blocks.forEach((b,i)=>{
       if(credits[b.activityId]>0){credits[b.activityId]-=b.minutes;return;}
-      const s={id:`generated-${day.date}-${i}-${b.activityId}`,date:day.date,start:b.start,end:b.end,interestId:b.activityId,done:false};
+      const s={id:`generated-${day.date}-${i}-${b.activityId}`,date:day.date,start:b.start,end:b.end,interestId:b.activityId,done:false,loadLevel:b.minutes>=45?'heavy':'light'};
       if(completed.some(c=>c.date===s.date&&minutes(c.start)<minutes(s.end)+10&&minutes(s.start)<minutes(c.end)+10)||fixed.some(c=>c.date===s.date&&minutes(c.start)<minutes(s.end)+10&&minutes(s.start)<minutes(c.end)+10)){skipped++;return;}
       items.push(s);
     }));
@@ -3718,7 +3778,9 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     if(form.id==='entryForm'){
       const editing=form.dataset.entry?state.sessions.find(x=>x.id===form.dataset.entry):null;
       const title=String(data.get('title')||'').trim(),kind=String(data.get('kind')||'other'),date=data.get('date'),start=data.get('start'),end=data.get('end'),note=String(data.get('note')||'').trim();
+      const loadLevel=String(data.get('loadLevel')||'');
       if(!title){showError('entryError','先给这条安排起个名字。');return;}
+      if(loadLevel!=='light'&&loadLevel!=='heavy'){showError('entryError','请选择这条日程是轻量还是高负荷。');return;}
       if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end)){showError('entryError','请填写有效的开始与结束时间。');return;}
       const from=minutes(start),to=minutes(end),min=to-from;
       if(min<15||min>480){showError('entryError','结束时间要比开始时间晚 15–480 分钟。');return;}
@@ -3738,7 +3800,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
       if(effect==='load')intensity=ai&&Number(ai.intensity)>0?Number(ai.intensity):local.score;
       if(effect==='rest')recovery=ai&&Number(ai.recovery)>0?Number(ai.recovery):60;
       const aiData=ai?{kind:ai.kind,typeLabel:ai.typeLabel,domainLabel:ai.domainLabel,effect:ai.effect,recovery:ai.recovery,intensity:ai.intensity,reason:ai.reason,confidence:ai.confidence}:undefined;
-      const item={...(editing||{}),id:editing?.id||'custom-'+Date.now().toString(36),date,start,end,title,kind,note,done:editing?.done||false,effect,intensity,recovery,ai:aiData};
+      const item={...(editing||{}),id:editing?.id||'custom-'+Date.now().toString(36),date,start,end,title,kind,note,done:editing?.done||false,effect,intensity,recovery,ai:aiData,loadLevel};
       if(editing)state.sessions[state.sessions.indexOf(editing)]=item;else state.sessions.push(item);
       saveState();closeDialog();render();toast(editing?'日程已更新。':'已加入这一周的安排。');
     }
