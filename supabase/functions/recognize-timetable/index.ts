@@ -287,7 +287,7 @@ async function postChat(apiKey: string, model: string, content: Array<Record<str
       body: JSON.stringify({ model, messages: [{ role: 'user', content }], temperature: 0, max_tokens: maxTokens }),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (response.status === 403) { lastResponse = response; continue; }
+    if (response.status === 401 || response.status === 403) { lastResponse = response; continue; }
     return response;
   }
   return lastResponse as Response;
@@ -354,7 +354,7 @@ async function recognize(apiKey: string, image: string, periods: string, periodI
     console.error(`recognize ${model} ${response.status}: ${detail}`);
 
     if (response.status === 401) {
-      throw new Error('DASHSCOPE_API_KEY 无效或没有权限，请在 Supabase 中重新设置密钥。');
+      throw new Error('DASHSCOPE_API_KEY 无效或已被禁用（国内站与国际站都拒绝），请在 Supabase 中换成有效的百炼密钥。');
     }
     // 把百炼返回的原因带出来，方便定位是额度、限流还是模型未开通。
     const reason = (() => {
