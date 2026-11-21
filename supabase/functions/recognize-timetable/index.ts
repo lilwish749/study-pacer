@@ -33,7 +33,7 @@ function json(body: unknown, status = 200): Response {
 const PROMPT = `你是一个课程表信息提取器。用户会上传一张课程表图片，请从中提取所有课程安排。
 
 输出要求：严格输出一个 JSON 对象，不要有任何解释文字，不要 Markdown 代码块。格式：
-{"periods":[{"from":5,"to":6,"start":"13:00","end":"14:30"},{"from":5,"to":7,"start":"13:00","end":"15:15"}],"courses":[{"courseName":"体育","weekday":1,"weekdayText":"周一","periodStart":5,"periodEnd":6,"startTime":"","endTime":"","location":"上课地点","weekRange":"3-8周、10-16周","weekSegments":[{"start":3,"end":8,"parity":"all"},{"start":10,"end":16,"parity":"all"}],"weekStart":3,"weekEnd":8,"weekParity":"all"}]}
+{"periods":[{"from":5,"to":6,"start":"13:00","end":"14:30"},{"from":5,"to":7,"start":"13:00","end":"15:15"}],"courses":[{"courseName":"体育","weekday":1,"weekdayText":"周一","periodText":"5-6节","periodStart":5,"periodEnd":6,"startTime":"","endTime":"","location":"上课地点","weekRange":"3-8周、10-16周","weekSegments":[{"start":3,"end":8,"parity":"all"},{"start":10,"end":16,"parity":"all"}],"weekStart":3,"weekEnd":8,"weekParity":"all"}]}
 
 periods 字段（节次时间对照表，只有用户提供了节次表才填）：
 - 把节次表里每一行原样抄成一条 {"from":起始节,"to":结束节,"start":"HH:mm","end":"HH:mm"}，一行都不能漏。
@@ -45,6 +45,7 @@ periods 字段（节次时间对照表，只有用户提供了节次表才填）
 - courseName：课程名称，按图片上的文字原样提取
 - weekday：星期几，用数字 1-7 表示（1=周一，7=周日）
 - weekdayText：这门课所在那一列的表头原文，例如「周一」「星期三」「Mon」。必须先读表头再确定 weekday，两者必须一致
+- periodText：课程格子里关于节次的原文片段，必须一字不改地抄下来，例如「5-6节」「第5-6节」「1-2节」「第7节」。这一项是系统换算时间的唯一依据，抄错就会排错时间；格子里写的是 5-6 就绝不能写成 1-2
 - periodStart / periodEnd：该课程格子里标注的起止节次（整数）。课程写着「第5-6节」就是 5 和 6；写着「第5-7节」才是 5 和 7；只占一节课就两个都填那个节次。课程直接写了具体时间时这两个填 null
 - startTime：只有当课程格子里直接写了时间才填写，格式 HH:mm（24 小时制）。用节次表示时必须是空字符串
 - endTime：结束时间，格式 HH:mm（24 小时制）
@@ -117,8 +118,11 @@ function normalizeCourses(raw: unknown): Array<Record<string, unknown>> {
     const weekday = parseWeekdayText(weekdayText) ?? Math.round(clampNumber(row.weekday, 1, 7, 1));
     const startTime = normalizeTime(row.startTime ?? row.start);
     const endTime = normalizeTime(row.endTime ?? row.end);
-    const periodStart = normalizeWeek(row.periodStart);
-    const periodEnd = normalizeWeek(row.periodEnd);
+    const periodText = String(row.periodText ?? row.period ?? '').trim().slice(0, 30);
+    // 节次原文也是硬证据：格子里写着「6-7节」，就以文字里的数字为准，覆盖模型给的数字。
+    const parsedPeriod = parsePeriodText(periodText);
+    const periodStart = parsedPeriod ? parsedPeriod.from : normalizeWeek(row.periodStart);
+    const periodEnd = parsedPeriod ? parsedPeriod.to : normalizeWeek(row.periodEnd);
     const location = String(row.location ?? row.place ?? '').trim().slice(0, 40);
     const weekStart = normalizeWeek(row.weekStart ?? row.startWeek);
     const weekEndRaw = normalizeWeek(row.weekEnd ?? row.endWeek);
@@ -139,7 +143,7 @@ function normalizeCourses(raw: unknown): Array<Record<string, unknown>> {
       }
     }
     if (!segments.length && weekStart !== null) segments.push({ start: weekStart, end: weekEnd ?? weekStart, parity });
-    result.push({ courseName, weekday, startTime, endTime, periodStart, periodEnd, location, weekRange, weekSegments: segments, weekStart, weekEnd, weekParity: parity });
+    result.push({ courseName, weekday, weekdayText, periodText, startTime, endTime, periodStart, periodEnd, location, weekRange, weekSegments: segments, weekStart, weekEnd, weekParity: parity });
   }
   return result.slice(0, 60);
 }
@@ -209,6 +213,22 @@ function resolveTimes(courses: Array<Record<string, unknown>>, periods: PeriodRa
 
 const WEEKDAY_WORDS: Record<string, number> = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 7, '天': 7 };
 
+// 从「第5-6节」「5,6节」「第7节」这类原文里解析节次，避免模型把 5-6 读成 1-2。
+function parsePeriodText(raw: unknown): { from: number; to: number } | null {
+  const text = String(raw ?? '');
+  const range = text.match(/(\d+)\s*[-~—–－至到]\s*(\d+)\s*节/) || text.match(/第?\s*(\d+)\s*[,，、]\s*(\d+)\s*节/);
+  if (range) {
+    const a = Number(range[1]), b = Number(range[2]);
+    if (Number.isFinite(a) && Number.isFinite(b)) return { from: Math.min(a, b), to: Math.max(a, b) };
+  }
+  const single = text.match(/第?\s*(\d+)\s*节/);
+  if (single) {
+    const n = Number(single[1]);
+    if (Number.isFinite(n)) return { from: n, to: n };
+  }
+  return null;
+}
+
 function parseWeekdayText(raw: unknown): number | null {
   const text = String(raw ?? '').trim().toLowerCase();
   if (!text) return null;
@@ -249,7 +269,7 @@ async function verifyConflicts(apiKey: string, image: string, periodImage: strin
   if (periodImage) content.push({ type: 'image_url', image_url: { url: periodImage } });
   content.push({
     type: 'text',
-    text: `下面这些课程被读到了同一天并且时间重叠，很可能是星期列或节次读错了。请重新仔细查看原图核实：\n${JSON.stringify(list)}\n\n输出 JSON：{"items":[{"courseName":"课程名","weekdayText":"该课所在列的标题原文，如 周三","periodStart":5,"periodEnd":6}]}\n要求：必须重新看图判断，不要照抄上面给的值；如果原图里确实同一天重叠，也照实回答。只输出 JSON。`,
+    text: `下面这些课程被读到了同一天并且时间重叠，很可能是星期列或节次读错了。请重新仔细查看原图核实：\n${JSON.stringify(list)}\n\n输出 JSON：{"items":[{"courseName":"课程名","weekdayText":"该课所在列的标题原文，如 周三","periodText":"该课格子里节次原文，如 5-6节"}]}\n要求：必须重新看图判断，不要照抄上面给的值；如果原图里确实同一天重叠，也照实回答。只输出 JSON。`,
   });
   for (const model of MODEL_LIST.slice(0, 2)) {
     try {
@@ -342,9 +362,12 @@ async function recognize(apiKey: string, image: string, periods: string, periodI
             const mapped = parseWeekdayText(item.weekdayText);
             if (mapped) target.weekday = mapped;
             else if (item.weekday !== undefined) target.weekday = Math.round(clampNumber(item.weekday, 1, 7, Number(target.weekday)));
-            const ps = normalizeWeek(item.periodStart), pe = normalizeWeek(item.periodEnd);
+            const verifiedPeriod = parsePeriodText(item.periodText);
+            const ps = verifiedPeriod ? verifiedPeriod.from : normalizeWeek(item.periodStart);
+            const pe = verifiedPeriod ? verifiedPeriod.to : normalizeWeek(item.periodEnd);
             if (ps !== null) target.periodStart = ps;
             if (pe !== null) target.periodEnd = pe;
+            if (verifiedPeriod) target.periodText = String(item.periodText ?? '').trim();
             if (`${target.weekday}|${target.periodStart}|${target.periodEnd}` !== before) fixed++;
           }
           resolveTimes(courses, periodTable);
