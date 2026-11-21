@@ -31,7 +31,7 @@ function json(body: unknown, status = 200): Response {
 const PROMPT = `你是一个课程表信息提取器。用户会上传一张课程表图片，请从中提取所有课程安排。
 
 输出要求：严格输出一个 JSON 对象，不要有任何解释文字，不要 Markdown 代码块。格式：
-{"periods":[{"from":5,"to":6,"start":"13:00","end":"14:30"},{"from":5,"to":7,"start":"13:00","end":"15:15"}],"courses":[{"courseName":"体育","weekday":1,"periodStart":5,"periodEnd":6,"startTime":"","endTime":"","location":"上课地点","weekRange":"3-8周、10-16周","weekSegments":[{"start":3,"end":8,"parity":"all"},{"start":10,"end":16,"parity":"all"}],"weekStart":3,"weekEnd":8,"weekParity":"all"}]}
+{"periods":[{"from":5,"to":6,"start":"13:00","end":"14:30"},{"from":5,"to":7,"start":"13:00","end":"15:15"}],"courses":[{"courseName":"体育","weekday":1,"weekdayText":"周一","periodStart":5,"periodEnd":6,"startTime":"","endTime":"","location":"上课地点","weekRange":"3-8周、10-16周","weekSegments":[{"start":3,"end":8,"parity":"all"},{"start":10,"end":16,"parity":"all"}],"weekStart":3,"weekEnd":8,"weekParity":"all"}]}
 
 periods 字段（节次时间对照表，只有用户提供了节次表才填）：
 - 把节次表里每一行原样抄成一条 {"from":起始节,"to":结束节,"start":"HH:mm","end":"HH:mm"}，一行都不能漏。
@@ -42,6 +42,7 @@ periods 字段（节次时间对照表，只有用户提供了节次表才填）
 字段规则：
 - courseName：课程名称，按图片上的文字原样提取
 - weekday：星期几，用数字 1-7 表示（1=周一，7=周日）
+- weekdayText：这门课所在那一列的表头原文，例如「周一」「星期三」「Mon」。必须先读表头再确定 weekday，两者必须一致
 - periodStart / periodEnd：该课程格子里标注的起止节次（整数）。课程写着「第5-6节」就是 5 和 6；写着「第5-7节」才是 5 和 7；只占一节课就两个都填那个节次。课程直接写了具体时间时这两个填 null
 - startTime：只有当课程格子里直接写了时间才填写，格式 HH:mm（24 小时制）。用节次表示时必须是空字符串
 - endTime：结束时间，格式 HH:mm（24 小时制）
@@ -63,7 +64,7 @@ periods 字段（节次时间对照表，只有用户提供了节次表才填）
 - 完全没有周次标注 → weekSegments=[]，weekStart/weekEnd=null，weekParity="all"
 
 提取规则：
-1. 所见即所得，只提取图片上真实存在的信息，不要猜测、不要补全、不要编造课程。
+1. 逐列读：先看表头确认这一列是周几，再读格子里的课。不同天的课程绝不能归到同一天。读完后自查：如果同一天里出现两门课时间重叠，几乎一定是星期列读错了，必须回到原图重新核对。所见即所得，只提取图片上真实存在的信息，不要猜测、不要补全、不要编造课程。
 2. 只读节次，绝不自己算时间。课程用节次表示时，periodStart/periodEnd 填原文节次，startTime/endTime 必须留空，由系统查节次表换算。即使你认为自己知道时间也不许填。
 3. 一条课程记录只对应课程表格子里的一个连续节次区间。格子写「5-6节」就是 5 到 6，绝不能因为节次表里有「三节连排」就把两节课扩成三节；只有格子明确写「5-7节」时才填 5 到 7。
 4. 同一天有多段不同的课程，必须分别列出为多条记录。
@@ -109,7 +110,9 @@ function normalizeCourses(raw: unknown): Array<Record<string, unknown>> {
     const row = item as Record<string, unknown>;
     const courseName = String(row.courseName ?? row.name ?? '').trim().slice(0, 40);
     if (!courseName) continue;
-    const weekday = Math.round(clampNumber(row.weekday, 1, 7, 1));
+    const weekdayText = String(row.weekdayText ?? '').trim().slice(0, 20);
+    // 列标题是硬证据：能从「周三」这类文字解析出星期，就以它为准，覆盖模型给的数字。
+    const weekday = parseWeekdayText(weekdayText) ?? Math.round(clampNumber(row.weekday, 1, 7, 1));
     const startTime = normalizeTime(row.startTime ?? row.start);
     const endTime = normalizeTime(row.endTime ?? row.end);
     const periodStart = normalizeWeek(row.periodStart);
@@ -202,6 +205,80 @@ function resolveTimes(courses: Array<Record<string, unknown>>, periods: PeriodRa
   return courses;
 }
 
+const WEEKDAY_WORDS: Record<string, number> = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 7, '天': 7 };
+
+function parseWeekdayText(raw: unknown): number | null {
+  const text = String(raw ?? '').trim().toLowerCase();
+  if (!text) return null;
+  const cn = text.match(/(?:周|星期|礼拜)\s*([一二三四五六日天])/);
+  if (cn) return WEEKDAY_WORDS[cn[1]] ?? null;
+  const idx = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].findIndex(k => text.startsWith(k));
+  return idx >= 0 ? idx + 1 : null;
+}
+
+function minutesOf(time: string): number {
+  const [h, m] = String(time || '').split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+type CourseConflict = { weekday: number; a: string; b: string; start: string; end: string };
+
+// 找出同一天里时间交叠的课程对。
+function detectConflicts(courses: Array<Record<string, unknown>>): CourseConflict[] {
+  const out: CourseConflict[] = [];
+  for (let day = 1; day <= 7; day++) {
+    const list = courses.filter(c => Number(c.weekday) === day && c.startTime && c.endTime)
+      .sort((a, b) => minutesOf(String(a.startTime)) - minutesOf(String(b.startTime)));
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        if (minutesOf(String(b.startTime)) >= minutesOf(String(a.endTime))) break;
+        out.push({ weekday: day, a: String(a.courseName), b: String(b.courseName), start: String(b.startTime), end: String(a.endTime) });
+      }
+    }
+  }
+  return out;
+}
+
+// 出现重叠时带着原图再问一次模型，让它重新确认这些课到底在哪一列、占哪几节。
+async function verifyConflicts(apiKey: string, image: string, periodImage: string, suspects: Array<Record<string, unknown>>) {
+  const list = suspects.map(c => ({ courseName: c.courseName, weekday: c.weekday, periodStart: c.periodStart, periodEnd: c.periodEnd }));
+  const content: Array<Record<string, unknown>> = [{ type: 'image_url', image_url: { url: image } }];
+  if (periodImage) content.push({ type: 'image_url', image_url: { url: periodImage } });
+  content.push({
+    type: 'text',
+    text: `下面这些课程被读到了同一天并且时间重叠，很可能是星期列或节次读错了。请重新仔细查看原图核实：\n${JSON.stringify(list)}\n\n输出 JSON：{"items":[{"courseName":"课程名","weekdayText":"该课所在列的标题原文，如 周三","periodStart":5,"periodEnd":6}]}\n要求：必须重新看图判断，不要照抄上面给的值；如果原图里确实同一天重叠，也照实回答。只输出 JSON。`,
+  });
+  for (const model of MODEL_LIST.slice(0, 2)) {
+    try {
+      const response = await fetch(`${DASHSCOPE_BASE}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ model, messages: [{ role: 'user', content }], temperature: 0, max_tokens: 1200 }),
+        signal: AbortSignal.timeout(45000),
+      });
+      if (!response.ok) {
+        console.error(`verify ${model} ${response.status}`);
+        continue;
+      }
+      const data = await response.json();
+      const text = String(data?.choices?.[0]?.message?.content || '');
+      let parsed: unknown = null;
+      try {
+        parsed = JSON.parse(text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim());
+      } catch {
+        parsed = null;
+      }
+      if (parsed && typeof parsed === 'object' && Array.isArray((parsed as Record<string, unknown>).items)) {
+        return ((parsed as Record<string, unknown>).items as Array<Record<string, unknown>>);
+      }
+    } catch (error) {
+      console.error(`verify ${model} failed: ${String(error)}`);
+    }
+  }
+  return [] as Array<Record<string, unknown>>;
+}
+
 async function recognize(apiKey: string, image: string, periods: string, periodImage: string) {
   let lastError: Error | null = null;
   const content: Array<Record<string, unknown>> = [{ type: 'image_url', image_url: { url: image } }];
@@ -246,8 +323,31 @@ async function recognize(apiKey: string, image: string, periods: string, periodI
       if (payload) {
         const periodTable = normalizePeriods(payload.periods);
         const courses = resolveTimes(normalizeCourses(payload.courses), periodTable);
-        console.log(`recognize ${model} ok: courses=${courses.length} periods=${periodTable.length}`);
-        return courses;
+        const detected = detectConflicts(courses);
+        let fixed = 0;
+        // 一发现同一天时间重叠，就带原图再核对一次，判断是识别错误还是课表本身重叠。
+        if (detected.length && detected.length <= 12) {
+          const names = new Set<string>();
+          detected.forEach(c => { names.add(c.a); names.add(c.b); });
+          const suspects = courses.filter(c => names.has(String(c.courseName)));
+          const verified = await verifyConflicts(apiKey, image, periodImage, suspects);
+          for (const item of verified) {
+            const target = courses.find(c => String(c.courseName).trim() === String(item.courseName ?? '').trim());
+            if (!target) continue;
+            const before = `${target.weekday}|${target.periodStart}|${target.periodEnd}`;
+            const mapped = parseWeekdayText(item.weekdayText);
+            if (mapped) target.weekday = mapped;
+            else if (item.weekday !== undefined) target.weekday = Math.round(clampNumber(item.weekday, 1, 7, Number(target.weekday)));
+            const ps = normalizeWeek(item.periodStart), pe = normalizeWeek(item.periodEnd);
+            if (ps !== null) target.periodStart = ps;
+            if (pe !== null) target.periodEnd = pe;
+            if (`${target.weekday}|${target.periodStart}|${target.periodEnd}` !== before) fixed++;
+          }
+          resolveTimes(courses, periodTable);
+        }
+        const remaining = detectConflicts(courses);
+        console.log(`recognize ${model} ok: courses=${courses.length} periods=${periodTable.length} detected=${detected.length} fixed=${fixed} remaining=${remaining.length}`);
+        return { courses, report: { detected: detected.length, fixed, remaining } };
       }
       console.error(`recognize ${model} unparsable: ${text.slice(0, 500)}`);
       lastError = new Error('无法解析识别结果，请尝试更清晰的图片。');
@@ -317,8 +417,8 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const courses = await recognize(apiKey, image, periods, periodImage);
-    return json({ courses });
+    const result = await recognize(apiKey, image, periods, periodImage);
+    return json(result);
   } catch (error) {
     const message = String((error as Error)?.message || '识别失败，请检查网络或稍后重试。');
     console.error('recognize-timetable failed:', message);
