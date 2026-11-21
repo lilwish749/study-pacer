@@ -55,10 +55,19 @@ const PROMPT = `你是一个课程表信息提取器。用户会上传一张课�
 
 提取规则：
 1. 所见即所得，只提取图片上真实存在的信息，不要猜测、不要补全、不要编造课程。
-2. 如果图片上写的是节次（如「第1-2节」），请结合表格的节次时间表换算成具体的开始和结束时间；换算不出来就留空字符串。
+2. 如果图片上写的是节次（如「第1-2节」）而不是时间：用户额外提供了节次时间对照（文字或第二张图片）时，必须按它换算成具体的 HH:mm；用户没有提供任何节次对照时，startTime 和 endTime 留空字符串，不要自己猜。
 3. 同一天有多段不同的课程，必须分别列出为多条记录。
 4. 周末没有课程就不要输出。
 5. 只输出 JSON 数组本身。如果一张课程都没有识别到，输出 []。`;
+
+// 用户补充的节次时间对照（纯文字）直接拼进 Prompt；图片形式的对照作为第二张图传给模型。
+function buildPrompt(periods: string): string {
+  if (!periods) return PROMPT;
+  return `${PROMPT}
+
+用户补充的节次时间对照（请严格按它把节次换算成 HH:mm）：
+${periods}`;
+}
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
   const n = Number(value);
@@ -129,8 +138,14 @@ function extractArray(text: string): unknown[] | null {
   return null;
 }
 
-async function recognize(apiKey: string, image: string) {
+async function recognize(apiKey: string, image: string, periods: string, periodImage: string) {
   let lastError: Error | null = null;
+  const content: Array<Record<string, unknown>> = [{ type: 'image_url', image_url: { url: image } }];
+  if (periodImage) {
+    content.push({ type: 'text', text: '第二张图片是节次时间表，请用它把课表里的节次换算成具体时间。' });
+    content.push({ type: 'image_url', image_url: { url: periodImage } });
+  }
+  content.push({ type: 'text', text: buildPrompt(periods) });
 
   for (const model of MODEL_LIST) {
     let response: Response;
@@ -146,10 +161,7 @@ async function recognize(apiKey: string, image: string) {
         messages: [
           {
             role: 'user',
-            content: [
-              { type: 'image_url', image_url: { url: image } },
-              { type: 'text', text: PROMPT },
-            ],
+            content,
           },
         ],
         temperature: 0,
@@ -214,8 +226,20 @@ Deno.serve(async (req: Request) => {
     return json({ error: '图片过大，请压缩或重新截图。' }, 413);
   }
 
+  // 可选的节次时间对照：文字直接拼进 Prompt，图片作为第二张图喂给模型。
+  const periods = String(body?.periods ?? '').trim().slice(0, 800);
+  const periodImage = String(body?.periodImage ?? '').trim();
+  if (periodImage) {
+    if (!/^data:image\/(png|jpe?g|webp|bmp);base64,/i.test(periodImage)) {
+      return json({ error: '节次时间表的图片格式不支持，请上传 JPG、PNG 或 WebP 图片。' }, 400);
+    }
+    if (periodImage.length > MAX_IMAGE_CHARS) {
+      return json({ error: '节次时间表图片过大，请压缩或重新截图。' }, 413);
+    }
+  }
+
   try {
-    const courses = await recognize(apiKey, image);
+    const courses = await recognize(apiKey, image, periods, periodImage);
     return json({ courses });
   } catch (error) {
     const message = String((error as Error)?.message || '识别失败，请检查网络或稍后重试。');

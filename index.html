@@ -295,6 +295,14 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
 .tt-row input:focus,.tt-row select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgb(184 166 248 / 16%)}
 .tt-row .icon-btn{min-width:38px;min-height:38px;border-radius:8px;color:var(--muted)}
 .tt-row .icon-btn:hover{color:var(--danger);background:#1c1c1c}
+.tt-hint{font-size:12px;color:var(--muted);margin:-4px 0 14px}
+.tt-periods{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:16px;background:#101010}
+.tt-periods summary{cursor:pointer;font-size:13px;color:var(--text);outline:none}
+.tt-periods p{font-size:12px;color:var(--muted);line-height:1.8;margin:10px 0}
+.tt-periods textarea{width:100%;min-height:88px;padding:9px;border:1px solid #505050;border-radius:8px;background:#0b0b0b;color:var(--text);font-size:12px;line-height:1.8;resize:vertical}
+.tt-periods textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgb(184 166 248 / 16%)}
+.tt-periods .tt-file{margin:0 0 10px}
+.tt-row.needs-time{border-color:rgb(230 195 124 / 45%);background:#1a1810}
 .week-block.clash{border-left-color:var(--warning);background:#201d16;box-shadow:inset 0 0 0 1px rgb(230 195 124 / 40%)}
 .week-block.clash:hover{background:#26221a}
 .week-block.clash .block-time:after{content:' · 时间重叠';color:var(--warning)}
@@ -3169,11 +3177,11 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
   // ===== 课程表图片识别导入 =====
   // 选图后先用 FileReader 显示缩略图，用户手动点「开始识别」才调用百炼；
   // 识别结果先进入可编辑的核对列表，确认后才写进周计划。
-  let timetableImage='', timetableBusy=false, timetableSeq=0;
+  let timetableImage='', timetableBusy=false, timetableSeq=0, timetablePeriodImage='';
   const TIMETABLE_MAX_BYTES=10*1024*1024;
   function openTimetableImport(){
-    timetableImage='';timetableBusy=false;timetableSeq++;
-    openDialog('上传课程表图片',`<div class="dialog-body"><p class="dialog-lead">上传一张课程表截图，AI 会读出课程名称、星期、时间和地点。识别结果会先列出来给你核对，确认后按周次放进日历。</p><input type="file" id="ttFile" class="tt-file" accept="image/*"><div id="ttPreview" class="tt-preview" hidden><img id="ttThumb" alt="课程表预览"><div class="tt-meta"><strong id="ttFileName">已选择图片</strong><p>确认是这张课程表后，再点「开始识别」。</p></div></div><p class="tt-hint">图片内容越清晰，识别越准。</p><p id="ttError" class="field-error" role="alert" hidden></p></div>`,button('close-dialog','取消')+button('recognize-timetable','开始识别',{primary:true}),'TIMETABLE / 课程表');
+    timetableImage='';timetablePeriodImage='';timetableBusy=false;timetableSeq++;
+    openDialog('上传课程表图片',`<div class="dialog-body"><p class="dialog-lead">上传一张课程表截图，AI 会读出课程名称、星期、时间和地点。识别结果会先列出来给你核对，确认后按周次放进日历。</p><input type="file" id="ttFile" class="tt-file" accept="image/*"><div id="ttPreview" class="tt-preview" hidden><img id="ttThumb" alt="课程表预览"><div class="tt-meta"><strong id="ttFileName">已选择图片</strong><p>确认是这张课程表后，再点「开始识别」。</p></div></div><details class="tt-periods"><summary>课程表只写「第几节」？补一份节次时间表（可选）</summary><p>很多课表只标「第 1-2 节」不写具体时间。补一份节次时间表后，识别时会自动换算成上课时间；不补的话，节次对应的课程时间会留空，需要你在核对页手动填。</p><input type="file" id="ttPeriodFile" class="tt-file" accept="image/*"><div id="ttPeriodPreview" class="tt-preview" hidden><img id="ttPeriodThumb" alt="节次时间表预览"><div class="tt-meta"><strong id="ttPeriodName">已选择节次时间表</strong><p>会用这张图换算每节课的时间。</p></div></div><textarea id="ttPeriods" maxlength="800" placeholder="也可以直接写文字，例如：&#10;第1节 08:00-08:45&#10;第2节 08:55-09:40&#10;第3-4节 10:00-11:40"></textarea></details><p class="tt-hint">图片内容越清晰，识别越准。</p><p id="ttError" class="field-error" role="alert" hidden></p></div>`,button('close-dialog','取消')+button('recognize-timetable','开始识别',{primary:true}),'TIMETABLE / 课程表');
   }
   function handleTimetableFile(input){
     const file=input.files&&input.files[0],error=document.getElementById('ttError');
@@ -3197,6 +3205,28 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
       compressTimetableImage(raw).then(dataUrl=>{if(dataUrl&&seq===timetableSeq)timetableImage=dataUrl;});
     };
     reader.onerror=()=>fail('这张图片读取失败，请换一张试试。');
+    reader.readAsDataURL(file);
+  }
+  function handleTimetablePeriodFile(input){
+    const file=input.files&&input.files[0],error=document.getElementById('ttError');
+    const fail=msg=>{if(error){error.textContent=msg;error.hidden=false;}};
+    timetablePeriodImage='';
+    if(!file)return;
+    if(!/^image\//.test(file.type)){fail('节次时间表请选择图片文件，或者直接写在下方的文字框里。');input.value='';return;}
+    if(file.size>TIMETABLE_MAX_BYTES){fail('节次时间表图片过大，请压缩或重新截图。');input.value='';return;}
+    const seq=timetableSeq;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      if(seq!==timetableSeq)return;
+      const raw=String(reader.result||'');
+      timetablePeriodImage=raw;
+      const box=document.getElementById('ttPeriodPreview'),thumb=document.getElementById('ttPeriodThumb'),name=document.getElementById('ttPeriodName');
+      if(thumb)thumb.src=raw;
+      if(box)box.hidden=false;
+      if(name)name.textContent=file.name||'已选择节次时间表';
+      compressTimetableImage(raw).then(dataUrl=>{if(dataUrl&&seq===timetableSeq)timetablePeriodImage=dataUrl;});
+    };
+    reader.onerror=()=>fail('这张节次时间表读取失败，请换一张试试。');
     reader.readAsDataURL(file);
   }
   function compressTimetableImage(dataUrl){
@@ -3231,7 +3261,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     try{
       // 视觉模型读整张课表比较慢，给 90 秒；超时前不会误报失败。
       const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('TIMEOUT')),90000);});
-      const request=authClient.functions.invoke('recognize-timetable',{body:{image:timetableImage}});
+      const request=authClient.functions.invoke('recognize-timetable',{body:{image:timetableImage,periods:String(document.getElementById('ttPeriods')?.value||'').trim(),periodImage:timetablePeriodImage}});
       const {data,error:fnError}=await Promise.race([request,timeout]);
       // 对话框已关闭或换了一张图：直接丢弃这次结果，不影响已有计划。
       if(seq!==timetableSeq||!modal.open)return;
@@ -3254,10 +3284,10 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     const anchor=semesterStart()||WEEK;
     const rows=courses.map(course=>{
       const ws=course.weekStart==null?'':String(course.weekStart),we=course.weekEnd==null?'':String(course.weekEnd);
-      const missing=!ws||!we;
-      return `<div class="tt-row ${missing?'needs-weeks':''}" data-tt-row><input data-tt-field="courseName" value="${e(course.courseName||'')}" placeholder="课程名称" aria-label="课程名称"><select data-tt-field="weekday" aria-label="星期">${DAY_NAMES.map((d,i)=>`<option value="${i+1}" ${Number(course.weekday)===i+1?'selected':''}>${d}</option>`).join('')}</select><input data-tt-field="startTime" type="time" value="${e(course.startTime||'')}" aria-label="开始时间"><input data-tt-field="endTime" type="time" value="${e(course.endTime||'')}" aria-label="结束时间"><input data-tt-field="location" value="${e(course.location||'')}" placeholder="地点（可选）" aria-label="地点"><button class="icon-btn" data-action="remove-timetable-row" aria-label="删除这一行">${icon('close')}</button><div class="tt-row-weeks"><span class="tt-weeks-label">周次</span><label>起始周<input data-tt-field="weekStart" data-tt-week type="number" min="1" max="30" value="${e(ws)}" placeholder="?"></label><label>结束周<input data-tt-field="weekEnd" data-tt-week type="number" min="1" max="30" value="${e(we)}" placeholder="?"></label><label>单双周<select data-tt-field="weekParity">${[['all','全部'],['odd','单周'],['even','双周']].map(([k,l])=>`<option value="${k}" ${(course.weekParity||'all')===k?'selected':''}>${l}</option>`).join('')}</select></label><span class="tt-missing" ${missing?'':'hidden'}>请补充周次范围</span></div></div>`;
+      const missing=!ws||!we,badTime=!course.startTime||!course.endTime;
+      return `<div class="tt-row ${missing?'needs-weeks':''} ${badTime?'needs-time':''}" data-tt-row><input data-tt-field="courseName" value="${e(course.courseName||'')}" placeholder="课程名称" aria-label="课程名称"><select data-tt-field="weekday" aria-label="星期">${DAY_NAMES.map((d,i)=>`<option value="${i+1}" ${Number(course.weekday)===i+1?'selected':''}>${d}</option>`).join('')}</select><input data-tt-field="startTime" type="time" value="${e(course.startTime||'')}" aria-label="开始时间"><input data-tt-field="endTime" type="time" value="${e(course.endTime||'')}" aria-label="结束时间"><input data-tt-field="location" value="${e(course.location||'')}" placeholder="地点（可选）" aria-label="地点"><button class="icon-btn" data-action="remove-timetable-row" aria-label="删除这一行">${icon('close')}</button><div class="tt-row-weeks"><span class="tt-weeks-label">周次</span><label>起始周<input data-tt-field="weekStart" data-tt-week type="number" min="1" max="30" value="${e(ws)}" placeholder="?"></label><label>结束周<input data-tt-field="weekEnd" data-tt-week type="number" min="1" max="30" value="${e(we)}" placeholder="?"></label><label>单双周<select data-tt-field="weekParity">${[['all','全部'],['odd','单周'],['even','双周']].map(([k,l])=>`<option value="${k}" ${(course.weekParity||'all')===k?'selected':''}>${l}</option>`).join('')}</select></label><span class="tt-missing" ${missing?'':'hidden'}>请补充周次范围</span><span class="tt-missing" ${badTime?'':'hidden'} data-tt-time-missing>请补充上课时间</span></div></div>`;
     }).join('');
-    openDialog('核对识别结果',`<div class="dialog-body"><p class="dialog-lead">共识别到 ${courses.length} 门课程。确认课程名、星期、时间、地点和周次后点「全部导入」，会按周次展开到未来多周。</p><div class="tt-anchor"><label for="ttAnchor">第 1 周的周一</label><input type="date" id="ttAnchor" value="${e(anchor)}"><span>课程周次按这个日期推算，下次导入会继续沿用。</span></div><div class="tt-rows">${rows}</div><p id="ttError" class="field-error" role="alert" hidden></p></div>`,button('close-dialog','取消')+button('import-timetable','全部导入',{primary:true}),'TIMETABLE / 课程表',true);
+    openDialog('核对识别结果',`<div class="dialog-body"><p class="dialog-lead">共识别到 ${courses.length} 门课程。确认课程名、星期、时间、地点和周次后点「全部导入」，会按周次展开到未来多周。标黄的行表示缺少时间或周次，需要你先补全。</p><div class="tt-anchor"><label for="ttAnchor">第 1 周的周一</label><input type="date" id="ttAnchor" value="${e(anchor)}"><span>课程周次按这个日期推算，下次导入会继续沿用。</span></div><div class="tt-rows">${rows}</div><p id="ttError" class="field-error" role="alert" hidden></p></div>`,button('close-dialog','取消')+button('import-timetable','全部导入',{primary:true}),'TIMETABLE / 课程表',true);
   }
   function importTimetable(){
     const rows=[...document.querySelectorAll('[data-tt-row]')],error=document.getElementById('ttError');
@@ -3527,12 +3557,22 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     if(event.target.matches('[data-quiz-domain]'))handleQuizDomain(event.target);
     if(event.target.matches('[data-quiz-exp],[data-quiz-int]'))handleQuizMatrix(event.target);
     if(event.target.matches('#ttFile'))handleTimetableFile(event.target);
+    if(event.target.matches('#ttPeriodFile'))handleTimetablePeriodFile(event.target);
+    if(event.target.matches('[data-tt-field="startTime"],[data-tt-field="endTime"]')){
+      const row=event.target.closest('[data-tt-row]');
+      if(row){
+        const bad=!timetableRowValue(row,'startTime')||!timetableRowValue(row,'endTime');
+        row.classList.toggle('needs-time',bad);
+        const timeHint=row.querySelector('[data-tt-time-missing]');
+        if(timeHint)timeHint.hidden=!bad;
+      }
+    }
     if(event.target.matches('[data-tt-week]')){
       const row=event.target.closest('[data-tt-row]');
       if(row){
         const missing=!timetableRowValue(row,'weekStart')||!timetableRowValue(row,'weekEnd');
         row.classList.toggle('needs-weeks',missing);
-        const hint=row.querySelector('.tt-missing');
+        const hint=row.querySelector('.tt-missing:not([data-tt-time-missing])');
         if(hint)hint.hidden=!missing;
       }
     }
