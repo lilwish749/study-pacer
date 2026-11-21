@@ -30,14 +30,20 @@ function json(body: unknown, status = 200): Response {
 
 const PROMPT = `你是一个课程表信息提取器。用户会上传一张课程表图片，请从中提取所有课程安排。
 
-输出要求：严格输出一个 JSON 数组，不要有任何解释文字，不要 Markdown 代码块。
-数组中每个元素包含以下字段：
-{"courseName":"课程名称","weekday":1,"startTime":"08:00","endTime":"09:40","location":"上课地点","weekRange":"3-8周、10-16周","weekSegments":[{"start":3,"end":8,"parity":"all"},{"start":10,"end":16,"parity":"all"}],"weekStart":3,"weekEnd":8,"weekParity":"all"}
+输出要求：严格输出一个 JSON 对象，不要有任何解释文字，不要 Markdown 代码块。格式：
+{"periods":[{"from":5,"to":6,"start":"13:00","end":"14:30"},{"from":5,"to":7,"start":"13:00","end":"15:15"}],"courses":[{"courseName":"体育","weekday":1,"periodStart":5,"periodEnd":6,"startTime":"","endTime":"","location":"上课地点","weekRange":"3-8周、10-16周","weekSegments":[{"start":3,"end":8,"parity":"all"},{"start":10,"end":16,"parity":"all"}],"weekStart":3,"weekEnd":8,"weekParity":"all"}]}
+
+periods 字段（节次时间对照表，只有用户提供了节次表才填）：
+- 把节次表里每一行原样抄成一条 {"from":起始节,"to":结束节,"start":"HH:mm","end":"HH:mm"}，一行都不能漏。
+- 一个单元格的时间同时覆盖两节课时（例如同一行里并列写着「第5节」「第6节」，右侧时间是 13:00-14:30），输出 from=5、to=6。
+- 如果节次表右侧还有「三节连排」「两节连排」这类合并列（例如 13:00-15:15（三节连排）），必须单独抄成一条 from=5、to=7，不要和两节的行混在一起。
+- 只抄表，不要自己推算、不要合并、不要补全不存在的行。没有提供节次表时输出 "periods":[]。
 
 字段规则：
 - courseName：课程名称，按图片上的文字原样提取
 - weekday：星期几，用数字 1-7 表示（1=周一，7=周日）
-- startTime：开始时间，格式 HH:mm（24 小时制）
+- periodStart / periodEnd：该课程格子里标注的起止节次（整数）。课程写着「第5-6节」就是 5 和 6；写着「第5-7节」才是 5 和 7；只占一节课就两个都填那个节次。课程直接写了具体时间时这两个填 null
+- startTime：只有当课程格子里直接写了时间才填写，格式 HH:mm（24 小时制）。用节次表示时必须是空字符串
 - endTime：结束时间，格式 HH:mm（24 小时制）
 - location：上课地点，图片上没有就填空字符串
 - weekRange：原始周次文本，例如 "1-8周"、"9-16周"、"1-16周(单)"、"2-15周(双)"、"3-8周、10-16周"，图中未标注则为空字符串
@@ -58,17 +64,18 @@ const PROMPT = `你是一个课程表信息提取器。用户会上传一张课�
 
 提取规则：
 1. 所见即所得，只提取图片上真实存在的信息，不要猜测、不要补全、不要编造课程。
-2. 如果图片上写的是节次（如「第1-2节」）而不是时间：用户额外提供了节次时间对照（文字或第二张图片）时，必须按它换算成具体的 HH:mm；用户没有提供任何节次对照时，startTime 和 endTime 留空字符串，不要自己猜。
-3. 同一天有多段不同的课程，必须分别列出为多条记录。
-4. 周末没有课程就不要输出。
-5. 只输出 JSON 数组本身。如果一张课程都没有识别到，输出 []。`;
+2. 只读节次，绝不自己算时间。课程用节次表示时，periodStart/periodEnd 填原文节次，startTime/endTime 必须留空，由系统查节次表换算。即使你认为自己知道时间也不许填。
+3. 一条课程记录只对应课程表格子里的一个连续节次区间。格子写「5-6节」就是 5 到 6，绝不能因为节次表里有「三节连排」就把两节课扩成三节；只有格子明确写「5-7节」时才填 5 到 7。
+4. 同一天有多段不同的课程，必须分别列出为多条记录。
+5. 周末没有课程就不要输出。
+6. 只输出 JSON 对象本身。如果一张课程都没有识别到，输出 {"periods":[],"courses":[]}。`;
 
 // 用户补充的节次时间对照（纯文字）直接拼进 Prompt；图片形式的对照作为第二张图传给模型。
 function buildPrompt(periods: string): string {
   if (!periods) return PROMPT;
   return `${PROMPT}
 
-用户补充的节次时间对照（请严格按它把节次换算成 HH:mm）：
+用户补充的节次时间对照（请原样抄进 periods 字段，不要自己推算时间）：
 ${periods}`;
 }
 
@@ -105,6 +112,8 @@ function normalizeCourses(raw: unknown): Array<Record<string, unknown>> {
     const weekday = Math.round(clampNumber(row.weekday, 1, 7, 1));
     const startTime = normalizeTime(row.startTime ?? row.start);
     const endTime = normalizeTime(row.endTime ?? row.end);
+    const periodStart = normalizeWeek(row.periodStart);
+    const periodEnd = normalizeWeek(row.periodEnd);
     const location = String(row.location ?? row.place ?? '').trim().slice(0, 40);
     const weekStart = normalizeWeek(row.weekStart ?? row.startWeek);
     const weekEndRaw = normalizeWeek(row.weekEnd ?? row.endWeek);
@@ -125,39 +134,79 @@ function normalizeCourses(raw: unknown): Array<Record<string, unknown>> {
       }
     }
     if (!segments.length && weekStart !== null) segments.push({ start: weekStart, end: weekEnd ?? weekStart, parity });
-    result.push({ courseName, weekday, startTime, endTime, location, weekRange, weekSegments: segments, weekStart, weekEnd, weekParity: parity });
+    result.push({ courseName, weekday, startTime, endTime, periodStart, periodEnd, location, weekRange, weekSegments: segments, weekStart, weekEnd, weekParity: parity });
   }
   return result.slice(0, 60);
 }
 
-function extractArray(text: string): unknown[] | null {
+function extractPayload(text: string): { periods: unknown[]; courses: unknown[] } | null {
   let source = String(text || '').trim();
   // 去掉 ```json ... ``` 这类代码块包裹
   const fence = source.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fence) source = fence[1].trim();
-  try {
-    const parsed = JSON.parse(source);
-    if (Array.isArray(parsed)) return parsed;
-  } catch {
-    // 继续尝试截取
+  const tryParse = (s: string): unknown => { try { return JSON.parse(s); } catch { return null; } };
+  let parsed = tryParse(source);
+  if (parsed === null) {
+    const start = source.indexOf('{'), end = source.lastIndexOf('}');
+    if (start >= 0 && end > start) parsed = tryParse(source.slice(start, end + 1));
   }
-  const start = source.indexOf('[');
-  const end = source.lastIndexOf(']');
-  if (start < 0 || end <= start) return null;
-  try {
-    const parsed = JSON.parse(source.slice(start, end + 1));
-    if (Array.isArray(parsed)) return parsed;
-  } catch {
-    return null;
+  if (parsed === null) {
+    const start = source.indexOf('['), end = source.lastIndexOf(']');
+    if (start >= 0 && end > start) parsed = tryParse(source.slice(start, end + 1));
+  }
+  if (Array.isArray(parsed)) return { periods: [] as unknown[], courses: parsed as unknown[] };
+  if (parsed && typeof parsed === 'object') {
+    const obj = parsed as Record<string, unknown>;
+    const courses = Array.isArray(obj.courses) ? obj.courses : (Array.isArray(obj.data) ? obj.data : []);
+    const periods = Array.isArray(obj.periods) ? obj.periods : [];
+    return { periods, courses };
   }
   return null;
+}
+
+type PeriodRange = { from: number; to: number; start: string; end: string };
+
+// 把模型抄下来的节次表规范化，供后面的时间换算使用。
+function normalizePeriods(raw: unknown): PeriodRange[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PeriodRange[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    const from = normalizeWeek(row.from ?? row.periodStart ?? row.startPeriod);
+    const to = normalizeWeek(row.to ?? row.periodEnd ?? row.endPeriod);
+    const start = normalizeTime(row.start ?? row.startTime);
+    const end = normalizeTime(row.end ?? row.endTime);
+    if (from === null || !start || !end) continue;
+    out.push({ from, to: to === null ? from : to, start, end });
+  }
+  return out;
+}
+
+// 用节次表把 periodStart/periodEnd 换算成时间。只要有节次，就以节次表为准，覆盖模型自己填的时间。
+function resolveTimes(courses: Array<Record<string, unknown>>, periods: PeriodRange[]) {
+  if (!periods.length) return courses;
+  for (const course of courses) {
+    const ps = Number(course.periodStart), pe = Number(course.periodEnd);
+    if (!Number.isFinite(ps) || !Number.isFinite(pe)) continue;
+    // 优先找完全相同的节次段（如 5-6 对应 13:00-14:30，5-7 对应 13:00-15:15）。
+    const exact = periods.find(p => p.from === ps && p.to === pe);
+    if (exact) { course.startTime = exact.start; course.endTime = exact.end; continue; }
+    // 没有完全匹配时，取覆盖起始节的最细一段的开始、覆盖结束节的最细一段的结束。
+    const span = (p: PeriodRange) => p.to - p.from;
+    const first = periods.filter(p => p.from <= ps && ps <= p.to).sort((a, b) => span(a) - span(b))[0];
+    const last = periods.filter(p => p.from <= pe && pe <= p.to).sort((a, b) => span(a) - span(b))[0];
+    if (first) course.startTime = first.start;
+    if (last) course.endTime = last.end;
+  }
+  return courses;
 }
 
 async function recognize(apiKey: string, image: string, periods: string, periodImage: string) {
   let lastError: Error | null = null;
   const content: Array<Record<string, unknown>> = [{ type: 'image_url', image_url: { url: image } }];
   if (periodImage) {
-    content.push({ type: 'text', text: '第二张图片是节次时间表，请用它把课表里的节次换算成具体时间。' });
+    content.push({ type: 'text', text: '第二张图片是节次时间表，请把表里每一行原样抄进 periods 字段。' });
     content.push({ type: 'image_url', image_url: { url: periodImage } });
   }
   content.push({ type: 'text', text: buildPrompt(periods) });
@@ -193,8 +242,13 @@ async function recognize(apiKey: string, image: string, periods: string, periodI
     if (response.ok) {
       const data = await response.json();
       const text = String(data?.choices?.[0]?.message?.content || '').trim();
-      const parsed = extractArray(text);
-      if (parsed) return normalizeCourses(parsed);
+      const payload = extractPayload(text);
+      if (payload) {
+        const periodTable = normalizePeriods(payload.periods);
+        const courses = resolveTimes(normalizeCourses(payload.courses), periodTable);
+        console.log(`recognize ${model} ok: courses=${courses.length} periods=${periodTable.length}`);
+        return courses;
+      }
       console.error(`recognize ${model} unparsable: ${text.slice(0, 500)}`);
       lastError = new Error('无法解析识别结果，请尝试更清晰的图片。');
       continue;
