@@ -2636,7 +2636,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
   function renderWeek(){
     const dl=dayLoad(TODAY);
     const weekSessions=state.sessions.filter(s=>s.date>=WEEK&&s.date<=dateAt(6));
-    main.innerHTML=pageHead('给这一周一点方向',`${weekTitle()} · 今天 ${dateLabel(TODAY)}`,button('export-calendar','导出日历',{icon:'download'})+button('upload-timetable','上传课程表',{icon:'image'})+button('add-entry','添加日程',{icon:'plus'})+button('generate','生成周计划',{primary:true,icon:'plus'}))+`
+    main.innerHTML=pageHead('给这一周一点方向',`${weekTitle()} · 今天 ${dateLabel(TODAY)}`,button('export-calendar','导出日历',{icon:'download'})+button('upload-timetable','上传课程表',{icon:'image'})+(timetableImportCount()?button('clear-timetable-imports',`清除导入 ${timetableImportCount()}`,{}):'')+button('add-entry','添加日程',{icon:'plus'})+button('generate','生成周计划',{primary:true,icon:'plus'}))+`
     <div class="week-summary"><span><strong class="accent">${amount(weekSessions.reduce((n,s)=>n+duration(s),0))}</strong> 已安排</span><span><strong>${weekSessions.filter(s=>s.done).length} / ${weekSessions.length}</strong> 次已完成</span><span><span class="status-dot"></span>预计周负荷 <strong>${loadTone()}</strong></span><span class="day-load-chip" style="--load-color:${dl.level.color}"><i class="status-dot" style="background:${dl.level.color}"></i>今日负荷 <strong>${dl.level.label}</strong></span></div>
     <div class="toolbar"><div class="segmented" aria-label="计划视图">${[['week','周视图'],['month','月历'],['list','每日列表']].map(([id,label])=>`<button data-week-view="${id}" aria-pressed="${weekView===id}">${label}</button>`).join('')}</div><span class="note">${weekView==='week'?'每格按时间顺序排列，并标出当天负荷':weekView==='month'?'完整日历，点任意一天查看当天安排':'选一天，只看这一天的安排'}</span></div>
     ${weekView==='week'?`<div class="week-nav"><button class="icon-btn round" data-action="week-prev" aria-label="上一周">←</button><div class="week-nav-title"><p class="eyebrow" style="margin:0 0 4px">WEEK</p><strong>${weekTitle()}</strong></div><div class="week-nav-actions">${button('week-today','回到本周')}<button class="icon-btn round" data-action="week-next" aria-label="下一周">→</button></div></div>`:''}
@@ -3367,6 +3367,18 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     if(extras.length)message+='；'+extras.join('；');
     toast(message,{action:'undo-timetable',label:'撤销',id:batch});
   }
+  function timetableImportCount(){return state.sessions.filter(s=>s.source==='syllabus-import').length;}
+  function openClearTimetableImports(){
+    const n=timetableImportCount();
+    if(!n){toast('现在没有课程表导入的日程。');return;}
+    openDialog('清除课程表导入的日程',`<div class="dialog-body"><p class="dialog-lead">当前有 <strong>${n}</strong> 条通过课程表图片导入的日程，包含之前几次导入的结果。清除只删除这些日程，你自己手动添加的安排不受影响。</p></div>`,button('close-dialog','取消')+button('confirm-clear-timetable','全部清除',{primary:true}),'TIMETABLE / 清理');
+  }
+  function clearTimetableImports(){
+    const before=state.sessions.length;
+    state.sessions=state.sessions.filter(s=>s.source!=='syllabus-import');
+    const removed=before-state.sessions.length;
+    closeDialog();saveState();render();toast(`已清除 ${removed} 条课程表导入的日程。`);
+  }
   // ===== 自定义日程的 AI 分类与负荷 =====
   // 前端先给出本地规则的即时结果，再异步用百炼补上更细的类型与每小时消耗强度。
   let entryAI=null, entryAIKey='', entryAITimer=null, entryAIReq=0, entryAIState='idle', entryKindTouched=false, entryEffectTouched=false;
@@ -3537,6 +3549,8 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
         state.sessions=state.sessions.filter(s=>s.batch!==id);
         saveState();render();toast(`已撤销本次导入的 ${n} 条日程。`);
       },
+      'clear-timetable-imports':()=>openClearTimetableImports(),
+      'confirm-clear-timetable':()=>clearTimetableImports(),
       'week-prev':()=>{WEEK=addDays(WEEK,-7);renderWeek();},
       'week-next':()=>{WEEK=addDays(WEEK,7);renderWeek();},
       'week-today':()=>{WEEK=WEEK_ORIGIN;renderWeek();},
