@@ -303,6 +303,8 @@ dialog[open]::backdrop{animation:backdropIn .3s ease}
 .tt-periods textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgb(184 166 248 / 16%)}
 .tt-periods .tt-file{margin:0 0 10px}
 .tt-row.needs-time{border-color:rgb(230 195 124 / 45%);background:#1a1810}
+.tt-weeks-tip{font-size:11px;color:var(--muted)}
+.tt-weeks-input input{min-width:220px}
 .week-block.clash{border-left-color:var(--warning);background:#201d16;box-shadow:inset 0 0 0 1px rgb(230 195 124 / 40%)}
 .week-block.clash:hover{background:#26221a}
 .week-block.clash .block-time:after{content:' · 时间重叠';color:var(--warning)}
@@ -3280,12 +3282,34 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     }
   }
   function timetableRowValue(row,field){return String(row.querySelector(`[data-tt-field="${field}"]`)?.value||'').trim();}
+  // 周次用一段文字表示，支持多段：3-8,10-16 或 1-16(单)。
+  const WEEK_PARITY_MARK={odd:'(单)',even:'(双)',all:''};
+  function weekSegmentsText(segments){
+    if(!Array.isArray(segments)||!segments.length)return '';
+    return segments.filter(s=>s&&Number.isFinite(Number(s.start)))
+      .map(s=>`${Number(s.start)}-${Number(s.end||s.start)}${WEEK_PARITY_MARK[s.parity]||''}`).join(',');
+  }
+  function parseWeekSegments(text){
+    const out=[];
+    String(text||'').replace(/[第周次：:（）()]/g,'').split(/[,，、;；\s]+/).filter(Boolean).forEach(token=>{
+      let parity='all',body=token;
+      const mark=body.match(/[（(]?\s*([单双])\s*[)）]?$/);
+      if(mark){parity=mark[1]==='单'?'odd':'even';body=body.slice(0,mark.index);}
+      const range=body.match(/^(\d+)\s*[-–—~～至]\s*(\d+)$/),single=body.match(/^(\d+)$/);
+      let a=null,b=null;
+      if(range){a=Number(range[1]);b=Number(range[2]);}else if(single){a=Number(single[1]);b=a;}
+      if(!Number.isFinite(a)||!Number.isFinite(b)||a<1||b<1)return;
+      a=Math.min(60,Math.max(1,a));b=Math.min(60,Math.max(1,b));
+      out.push({start:Math.min(a,b),end:Math.max(a,b),parity});
+    });
+    return out;
+  }
   function renderTimetableReview(courses){
     const anchor=semesterStart()||WEEK;
     const rows=courses.map(course=>{
-      const ws=course.weekStart==null?'':String(course.weekStart),we=course.weekEnd==null?'':String(course.weekEnd);
-      const missing=!ws||!we,badTime=!course.startTime||!course.endTime;
-      return `<div class="tt-row ${missing?'needs-weeks':''} ${badTime?'needs-time':''}" data-tt-row><input data-tt-field="courseName" value="${e(course.courseName||'')}" placeholder="课程名称" aria-label="课程名称"><select data-tt-field="weekday" aria-label="星期">${DAY_NAMES.map((d,i)=>`<option value="${i+1}" ${Number(course.weekday)===i+1?'selected':''}>${d}</option>`).join('')}</select><input data-tt-field="startTime" type="time" value="${e(course.startTime||'')}" aria-label="开始时间"><input data-tt-field="endTime" type="time" value="${e(course.endTime||'')}" aria-label="结束时间"><input data-tt-field="location" value="${e(course.location||'')}" placeholder="地点（可选）" aria-label="地点"><button class="icon-btn" data-action="remove-timetable-row" aria-label="删除这一行">${icon('close')}</button><div class="tt-row-weeks"><span class="tt-weeks-label">周次</span><label>起始周<input data-tt-field="weekStart" data-tt-week type="number" min="1" max="30" value="${e(ws)}" placeholder="?"></label><label>结束周<input data-tt-field="weekEnd" data-tt-week type="number" min="1" max="30" value="${e(we)}" placeholder="?"></label><label>单双周<select data-tt-field="weekParity">${[['all','全部'],['odd','单周'],['even','双周']].map(([k,l])=>`<option value="${k}" ${(course.weekParity||'all')===k?'selected':''}>${l}</option>`).join('')}</select></label><span class="tt-missing" ${missing?'':'hidden'}>请补充周次范围</span><span class="tt-missing" ${badTime?'':'hidden'} data-tt-time-missing>请补充上课时间</span></div></div>`;
+      const ranges=weekSegmentsText(course.weekSegments);
+      const missing=!ranges,badTime=!course.startTime||!course.endTime;
+      return `<div class="tt-row ${missing?'needs-weeks':''} ${badTime?'needs-time':''}" data-tt-row><input data-tt-field="courseName" value="${e(course.courseName||'')}" placeholder="课程名称" aria-label="课程名称"><select data-tt-field="weekday" aria-label="星期">${DAY_NAMES.map((d,i)=>`<option value="${i+1}" ${Number(course.weekday)===i+1?'selected':''}>${d}</option>`).join('')}</select><input data-tt-field="startTime" type="time" value="${e(course.startTime||'')}" aria-label="开始时间"><input data-tt-field="endTime" type="time" value="${e(course.endTime||'')}" aria-label="结束时间"><input data-tt-field="location" value="${e(course.location||'')}" placeholder="地点（可选）" aria-label="地点"><button class="icon-btn" data-action="remove-timetable-row" aria-label="删除这一行">${icon('close')}</button><div class="tt-row-weeks"><span class="tt-weeks-label">周次</span><label class="tt-weeks-input">上课周次<input data-tt-field="weekRanges" data-tt-week value="${e(ranges)}" maxlength="60" placeholder="如 3-8,10-16；单双周写 1-16(单)"></label><span class="tt-weeks-tip">断开就写多段，中间空过的周不会排课</span><span class="tt-missing" ${missing?'':'hidden'}>请补充周次范围</span><span class="tt-missing" ${badTime?'':'hidden'} data-tt-time-missing>请补充上课时间</span></div></div>`;
     }).join('');
     openDialog('核对识别结果',`<div class="dialog-body"><p class="dialog-lead">共识别到 ${courses.length} 门课程。确认课程名、星期、时间、地点和周次后点「全部导入」，会按周次展开到未来多周。标黄的行表示缺少时间或周次，需要你先补全。</p><div class="tt-anchor"><label for="ttAnchor">第 1 周的周一</label><input type="date" id="ttAnchor" value="${e(anchor)}"><span>课程周次按这个日期推算，下次导入会继续沿用。</span></div><div class="tt-rows">${rows}</div><p id="ttError" class="field-error" role="alert" hidden></p></div>`,button('close-dialog','取消')+button('import-timetable','全部导入',{primary:true}),'TIMETABLE / 课程表',true);
   }
@@ -3303,21 +3327,22 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
       const startTime=timetableRowValue(row,'startTime'),endTime=timetableRowValue(row,'endTime');
       const location=timetableRowValue(row,'location');
       if(!courseName||!startTime||!endTime||minutes(endTime)<=minutes(startTime)){invalid.push(index+1);return;}
-      const rawStart=Number(timetableRowValue(row,'weekStart')),rawEnd=Number(timetableRowValue(row,'weekEnd'));
-      if(!Number.isInteger(rawStart)||!Number.isInteger(rawEnd)||rawStart<1||rawEnd<1){missing.push(index+1);return;}
-      const a=Math.min(Math.max(1,rawStart),60),b=Math.min(Math.max(1,rawEnd),60);
-      const start=Math.min(a,b),end=Math.max(a,b),parity=timetableRowValue(row,'weekParity')||'all';
-      const title=courseName.slice(0,40),range=`${start}-${end}周${parity==='odd'?'(单)':parity==='even'?'(双)':''}`,load=titleLoad(title);
+      const segments=parseWeekSegments(timetableRowValue(row,'weekRanges'));
+      if(!segments.length){missing.push(index+1);return;}
+      const title=courseName.slice(0,40),load=titleLoad(title);
       let scheduled=false;
-      for(let w=start;w<=end;w++){
-        if(parity==='odd'&&w%2===0)continue;
-        if(parity==='even'&&w%2!==1)continue;
+      segments.forEach(seg=>{
+      const range=`${seg.start}-${seg.end}周${seg.parity==='odd'?'(单)':seg.parity==='even'?'(双)':''}`;
+      for(let w=seg.start;w<=seg.end;w++){
+        if(seg.parity==='odd'&&w%2===0)continue;
+        if(seg.parity==='even'&&w%2!==1)continue;
         const date=addDays(base,(w-1)*7+weekday-1);
         if(state.sessions.some(s=>s.source==='syllabus-import'&&s.title===title&&s.date===date&&s.start===startTime&&s.end===endTime)){duplicates++;continue;}
         if(state.sessions.some(s=>s.date===date&&minutes(s.start)<minutes(endTime)&&minutes(startTime)<minutes(s.end)))conflicts++;
         created.push({id:'custom-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),date,start:startTime,end:endTime,title,kind:'class',note:location?`地点：${location}`:'',done:false,effect:load.effect,intensity:load.score,recovery:load.recovery||0,source:'syllabus-import',batch,weekRange:range});
         weekHits.push(w);scheduled=true;
       }
+      });
       if(scheduled)courseCount++;
     });
     if(invalid.length){fail(`第 ${invalid.join('、')} 行的课程名或时间不完整，补全后再导入。`);return;}
@@ -3570,7 +3595,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     if(event.target.matches('[data-tt-week]')){
       const row=event.target.closest('[data-tt-row]');
       if(row){
-        const missing=!timetableRowValue(row,'weekStart')||!timetableRowValue(row,'weekEnd');
+        const missing=!parseWeekSegments(timetableRowValue(row,'weekRanges')).length;
         row.classList.toggle('needs-weeks',missing);
         const hint=row.querySelector('.tt-missing:not([data-tt-time-missing])');
         if(hint)hint.hidden=!missing;

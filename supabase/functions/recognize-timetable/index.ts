@@ -32,7 +32,7 @@ const PROMPT = `你是一个课程表信息提取器。用户会上传一张课�
 
 输出要求：严格输出一个 JSON 数组，不要有任何解释文字，不要 Markdown 代码块。
 数组中每个元素包含以下字段：
-{"courseName":"课程名称","weekday":1,"startTime":"08:00","endTime":"09:40","location":"上课地点","weekRange":"1-8周","weekStart":1,"weekEnd":8,"weekParity":"all"}
+{"courseName":"课程名称","weekday":1,"startTime":"08:00","endTime":"09:40","location":"上课地点","weekRange":"3-8周、10-16周","weekSegments":[{"start":3,"end":8,"parity":"all"},{"start":10,"end":16,"parity":"all"}],"weekStart":3,"weekEnd":8,"weekParity":"all"}
 
 字段规则：
 - courseName：课程名称，按图片上的文字原样提取
@@ -40,18 +40,21 @@ const PROMPT = `你是一个课程表信息提取器。用户会上传一张课�
 - startTime：开始时间，格式 HH:mm（24 小时制）
 - endTime：结束时间，格式 HH:mm（24 小时制）
 - location：上课地点，图片上没有就填空字符串
-- weekRange：原始周次文本，例如 "1-8周"、"9-16周"、"1-16周(单)"、"2-15周(双)"，图中未标注则为空字符串
-- weekStart：起始周次整数，无法确定时为 null
-- weekEnd：结束周次整数，无法确定时为 null
-- weekParity："all" | "odd" | "even"，无标注默认 "all"
+- weekRange：原始周次文本，例如 "1-8周"、"9-16周"、"1-16周(单)"、"2-15周(双)"、"3-8周、10-16周"，图中未标注则为空字符串
+- weekSegments：把周次拆成数组，每一段一个对象 {"start":起始周,"end":结束周,"parity":"all|odd|even"}。中间断开的周次必须拆成多段，缺失的周不要包含进来
+- weekStart：第一段的起始周次整数，无法确定时为 null
+- weekEnd：第一段的结束周次整数，无法确定时为 null
+- weekParity：第一段的单双周，"all" | "odd" | "even"，无标注默认 "all"
 
 周次换算规则：
-- "1-8周" → weekStart=1, weekEnd=8, weekParity="all"
-- "9-16周" → weekStart=9, weekEnd=16, weekParity="all"
-- "1-16周(单)" → weekStart=1, weekEnd=16, weekParity="odd"
-- "2-16周(双)" → weekStart=2, weekEnd=16, weekParity="even"
-- 只标注单个周次如"第5周" → weekStart=5, weekEnd=5, weekParity="all"
-- 完全没有周次标注 → weekStart=null, weekEnd=null, weekParity="all"
+- "1-8周" → weekSegments=[{start:1,end:8,parity:"all"}]
+- "9-16周" → weekSegments=[{start:9,end:16,parity:"all"}]
+- "1-16周(单)" → weekSegments=[{start:1,end:16,parity:"odd"}]
+- "2-16周(双)" → weekSegments=[{start:2,end:16,parity:"even"}]
+- "3-8周、10-16周" → weekSegments=[{start:3,end:8,parity:"all"},{start:10,end:16,parity:"all"}]，第 9 周不上课，不能写成一整段 3-16
+- "1-8周、10-16周(单)" → weekSegments=[{start:1,end:8,parity:"all"},{start:10,end:16,parity:"odd"}]
+- 只标注单个周次如"第5周" → weekSegments=[{start:5,end:5,parity:"all"}]
+- 完全没有周次标注 → weekSegments=[]，weekStart/weekEnd=null，weekParity="all"
 
 提取规则：
 1. 所见即所得，只提取图片上真实存在的信息，不要猜测、不要补全、不要编造课程。
@@ -109,8 +112,20 @@ function normalizeCourses(raw: unknown): Array<Record<string, unknown>> {
     const parity = ['all', 'odd', 'even'].includes(String(row.weekParity))
       ? String(row.weekParity)
       : 'all';
-    const weekRange = String(row.weekRange ?? '').trim().slice(0, 40);
-    result.push({ courseName, weekday, startTime, endTime, location, weekRange, weekStart, weekEnd, weekParity: parity });
+    const weekRange = String(row.weekRange ?? '').trim().slice(0, 80);
+    // 多段周次：模型给了 weekSegments 就用它，否则退回单段 weekStart/weekEnd。
+    const segments: Array<{ start: number; end: number; parity: string }> = [];
+    if (Array.isArray(row.weekSegments)) {
+      for (const seg of row.weekSegments as Array<Record<string, unknown>>) {
+        if (!seg || typeof seg !== 'object') continue;
+        const s = normalizeWeek(seg.start), e = normalizeWeek(seg.end);
+        if (s === null) continue;
+        const p = ['all', 'odd', 'even'].includes(String(seg.parity)) ? String(seg.parity) : parity;
+        segments.push({ start: s, end: e === null ? s : e, parity: p });
+      }
+    }
+    if (!segments.length && weekStart !== null) segments.push({ start: weekStart, end: weekEnd ?? weekStart, parity });
+    result.push({ courseName, weekday, startTime, endTime, location, weekRange, weekSegments: segments, weekStart, weekEnd, weekParity: parity });
   }
   return result.slice(0, 60);
 }
