@@ -6,12 +6,12 @@ const DASHSCOPE_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 // 国际站：如果密钥是在国际站创建的，国内站会返回 403 Access denied，这时切到国际站再试一次。
 const DASHSCOPE_INTL_BASE = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
 
-// 视觉模型：优先 qwen-vl-plus，未开通时依次回退到其他已开通的 qwen-vl 系列。
-const MODELS = (Deno.env.get('DASHSCOPE_VL_MODEL') || 'qwen-vl-plus')
+// 视觉模型：优先 qwen3-vl-plus；没开通的模型会返回 404，自动回退到其他视觉模型。
+const MODELS = (Deno.env.get('DASHSCOPE_VL_MODEL') || 'qwen3-vl-plus')
   .split(',')
   .map(m => m.trim())
   .filter(Boolean)
-  .concat(['qwen-vl-max', 'qwen3-vl-plus', 'qwen2.5-vl-72b-instruct']);
+  .concat(['qwen-vl-ocr-2025-11-20', 'qwen-vl-ocr', 'qwen3.5-ocr']);
 const MODEL_LIST = MODELS.filter((m, i) => MODELS.indexOf(m) === i);
 
 const CORS_HEADERS = {
