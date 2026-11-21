@@ -3260,12 +3260,12 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     const btn=document.querySelector('[data-action="recognize-timetable"]'),label=btn?btn.innerHTML:'';
     if(btn){btn.disabled=true;btn.textContent='识别中…';}
     const hint=document.querySelector('.tt-hint'),hintText=hint?hint.textContent:'';
-    if(hint)hint.textContent='正在识别，图片越复杂需要的时间越长，请稍等 10–40 秒。';
+    if(hint)hint.textContent='正在识别，图片越复杂需要的时间越长，通常 20–90 秒；若检测到时间重叠还会自动复核一次。';
     if(error){error.hidden=true;error.textContent='';}
     let timer=null;
     try{
-      // 视觉模型读整张课表比较慢，给 90 秒；超时前不会误报失败。
-      const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('TIMEOUT')),90000);});
+      // 识别 + 冲突复核是两次模型调用，整体可能接近两分钟，给到 180 秒。
+      const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('TIMEOUT')),180000);});
       const request=authClient.functions.invoke('recognize-timetable',{body:{image:timetableImage,periods:String(document.getElementById('ttPeriods')?.value||'').trim(),periodImage:timetablePeriodImage}});
       const {data,error:fnError}=await Promise.race([request,timeout]);
       // 对话框已关闭或换了一张图：直接丢弃这次结果，不影响已有计划。
@@ -3277,7 +3277,7 @@ dialog.wide{width:min(920px,calc(100vw - 32px))}
     }catch(exception){
       if(seq!==timetableSeq||!modal.open)return;
       const raw=String((exception&&exception.message)||exception||'');
-      fail(raw==='TIMEOUT'?'识别失败，请检查网络或稍后重试':raw||'识别失败，请检查网络或稍后重试');
+      fail(raw==='TIMEOUT'?'识别超时了（视觉模型处理时间较长），请稍后再试；也可以先压缩图片再上传':raw||'识别失败，请检查网络或稍后重试');
     }finally{
       clearTimeout(timer);timetableBusy=false;
       if(hint&&hint.isConnected)hint.textContent=hintText;

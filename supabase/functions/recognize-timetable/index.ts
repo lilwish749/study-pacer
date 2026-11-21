@@ -255,7 +255,7 @@ async function verifyConflicts(apiKey: string, image: string, periodImage: strin
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({ model, messages: [{ role: 'user', content }], temperature: 0, max_tokens: 1200 }),
-        signal: AbortSignal.timeout(45000),
+        signal: AbortSignal.timeout(35000),
       });
       if (!response.ok) {
         console.error(`verify ${model} ${response.status}`);
@@ -308,7 +308,7 @@ async function recognize(apiKey: string, image: string, periods: string, periodI
         temperature: 0,
         max_tokens: 4000,
       }),
-        signal: AbortSignal.timeout(55000),
+        signal: AbortSignal.timeout(45000),
       });
     } catch (error) {
       console.error(`recognize ${model} request failed: ${String(error)}`);
