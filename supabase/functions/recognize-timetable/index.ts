@@ -260,8 +260,17 @@ async function recognize(apiKey: string, image: string, periods: string, periodI
     if (response.status === 401) {
       throw new Error('DASHSCOPE_API_KEY 无效或没有权限，请在 Supabase 中重新设置密钥。');
     }
+    // 把百炼返回的原因带出来，方便定位是额度、限流还是模型未开通。
+    const reason = (() => {
+      try {
+        const body = JSON.parse(detail);
+        return String(body?.error?.message || body?.message || '').replace(/\s+/g, ' ').slice(0, 90);
+      } catch {
+        return detail.replace(/\s+/g, ' ').slice(0, 90);
+      }
+    })();
     if ([400, 403, 404, 429].includes(response.status) || response.status >= 500) {
-      lastError = new Error('识别服务暂时不可用，请稍后再试。');
+      lastError = new Error(`识别服务暂时不可用（HTTP ${response.status}${reason ? '：' + reason : ''}）。`);
       continue;
     }
     lastError = new Error('识别失败，请检查网络或稍后重试。');
