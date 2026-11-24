@@ -516,6 +516,34 @@ h3{font-weight:650}
 .sort-item{border:0;background:#121214;border-radius:12px}
 .pcard-tier{border-color:#2c2c31}
 
+/* 任务类型：不增不减的小任务 vs 会改变负荷的活动 */
+.task-kind{display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;font-size:10.5px;font-weight:600;border:1px solid transparent;white-space:nowrap}
+.task-kind.neutral{color:#c9c6d2;border:1px dashed #4a4853;background:#17171a}
+.task-kind.load{color:#1b1226;background:var(--accent);border-color:transparent}
+.task-kind.rest{color:#123024;background:var(--mint);border-color:transparent}
+.task-card{border-radius:16px;padding:16px 18px;margin-bottom:24px;display:grid;gap:9px}
+.task-card.neutral{border:1px dashed #3d3b46;background:#131316}
+.task-card.rest{border:1px solid #2a4a36;border-left:3px solid #3FB950;background:#14201a}
+.task-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.task-card-head b{font-size:20px;font-weight:750;letter-spacing:-.02em}
+.task-card.neutral .task-card-head b{color:#d7d4de}
+.task-card.rest .task-card-head b{color:#bdf5ce}
+.task-card .eyebrow{margin:0;font-size:10px;letter-spacing:.16em;color:#8d8a95}
+.task-card.rest .eyebrow{color:#84b697}
+.task-card p{margin:0;font-size:11px;line-height:1.75;color:#9c99a3}
+.task-card.rest p{color:#a9c9b6}
+.task-card .task-note{color:#8f8c96}
+.load-preview-inner.is-neutral{border:1px dashed #3f3c48;border-left:1px dashed #3f3c48;background:#141417}
+.load-preview-inner.is-rest{border-color:#2a4a36;border-left-color:#3FB950;background:#131d17}
+.load-preview-inner .effect-pill{font-size:10.5px;font-weight:600;border-radius:999px;padding:2px 8px;border:1px dashed #4a4853;color:#c9c6d2}
+.load-preview-inner.is-rest .effect-pill{border:0;background:rgb(63 185 80 / 16%);color:#9fe3ad}
+.load-preview-inner.is-load .effect-pill{border:0;background:var(--accent);color:#1b1226}
+.week-block.neutral-task{background:#141416;border:1px dashed #38353f;border-left:1px dashed #4c4954;color:#c9c6d2}
+.week-block.neutral-task h3{color:#a8a4b2;font-weight:500;letter-spacing:0}
+.week-block.neutral-task .block-time{color:#918d9b}
+.week-block.neutral-task:hover{background:#1a1a1e;border-color:#4a4753}
+.mini-kind{display:inline-block;margin-left:8px;padding:1px 7px;border:1px dashed #45424d;border-radius:999px;font-size:9.5px;font-weight:500;color:#a5a1ae;vertical-align:2px}
+
 /* 弹窗与提示 */
 dialog{background:#151517;border:0;border-radius:24px;box-shadow:0 40px 120px #000c}
 .dialog-head{background:#151517;border-bottom:1px solid #232327;padding:24px 26px 16px}
@@ -2861,7 +2889,8 @@ dialog{background:#151517;border:0;border-radius:24px;box-shadow:0 40px 120px #0
   }
   function taskRow(s){
     const a=interest(s.interestId);if(!isCustom(s)&&!a)return '';
-    return `<div class="task-row ${s.done?'done':''}"><label class="check-wrap"><input class="check" type="checkbox" data-complete="${e(s.id)}" ${s.done?'checked':''} aria-label="${e(s.done?'取消完成':'标记完成')} ${e(sessionTitle(s))}"></label><div class="task-time">${s.start}</div><div class="task-copy" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情"><h3>${e(sessionTitle(s))}</h3></div><div class="task-end"><button class="icon-btn" data-action="${isCustom(s)?'edit-entry':'move-session'}" data-id="${e(s.id)}" aria-label="调整 ${e(sessionTitle(s))} 的时间">${icon('edit')}</button></div></div>`;
+    const neutral=isCustom(s)&&sessionEffect(s)==='neutral';
+    return `<div class="task-row ${s.done?'done':''}"><label class="check-wrap"><input class="check" type="checkbox" data-complete="${e(s.id)}" ${s.done?'checked':''} aria-label="${e(s.done?'取消完成':'标记完成')} ${e(sessionTitle(s))}"></label><div class="task-time">${s.start}</div><div class="task-copy" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情"><h3>${e(sessionTitle(s))}${neutral?'<span class="mini-kind">小任务</span>':''}</h3></div><div class="task-end"><button class="icon-btn" data-action="${isCustom(s)?'edit-entry':'move-session'}" data-id="${e(s.id)}" aria-label="调整 ${e(sessionTitle(s))} 的时间">${icon('edit')}</button></div></div>`;
   }
   function renderInterests(){
     main.innerHTML=pageHead('让兴趣有个去处','先收好想做的事，再决定什么时候开始。',button('add-interest','记录新兴趣',{primary:true,icon:'plus'}))+`
@@ -2919,8 +2948,8 @@ dialog{background:#151517;border:0;border-radius:24px;box-shadow:0 40px 120px #0
     return state.sessions.some(o=>o.id!==s.id&&o.date===s.date&&minutes(o.start)<to&&from<minutes(o.end));
   }
   function weekBlock(s){
-    const custom=isCustom(s),li=sessionLoad(s),clash=sessionClash(s);
-    return `<article class="week-block ${s.done?'done':''} ${custom?'custom':''} ${clash?'clash':''}" style="--load-color:${li?li.color:'#807499'}" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情${clash?'（与当天其他安排时间重叠）':''}"><span class="block-time">${s.start} – ${s.end}${s.done?' · 已完成':''}</span><h3>${e(sessionTitle(s))}</h3></article>`;
+    const custom=isCustom(s),li=sessionLoad(s),clash=sessionClash(s),neutral=custom&&sessionEffect(s)==='neutral';
+    return `<article class="week-block ${s.done?'done':''} ${custom?'custom':''} ${neutral?'neutral-task':''} ${clash?'clash':''}" style="--load-color:${li?li.color:'#807499'}" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情${clash?'（与当天其他安排时间重叠）':''}"><span class="block-time">${s.start} – ${s.end}${s.done?' · 已完成':''}</span><h3>${e(sessionTitle(s))}</h3></article>`;
   }
   // 推荐参考：把「网站/App/方法」拆成小标签，识别到公开网址时变成可点击链接。
   function refChips(text){
@@ -2952,8 +2981,12 @@ dialog{background:#151517;border:0;border-radius:24px;box-shadow:0 40px 120px #0
     const day=custom?null:planDayFor(s);
     const detail=s.detail||(day&&day.detail);
     const effect=custom?sessionEffect(s):'load',eff=effectMeta(effect),isLoad=effect==='load';
+    const effectTag=isLoad?'<span class="task-kind load">活动 · 增加负荷</span>':`<span class="task-kind ${effect}">${effect==='rest'?'休息 · 减少负荷':'小任务 · 不增不减'}</span>`;
+    const effectPanel=isLoad
+      ?`<div class="load-card" style="--load-color:${li?li.color:'#807499'}"><div class="load-card-head"><p class="eyebrow" style="margin:0">负荷评估 / 五档</p><b>${li?li.label:'—'}</b></div>${li?loadGauge(li):''}<p class="load-note">${e(li?li.note:'')} 类型与负荷由 AI 结合名称和备注判断，也可以手动改类型后保存。</p><p class="load-src">主要依据：${e(li?li.top:'—')}</p></div>`
+      :`<div class="task-card ${effect}"><div class="task-card-head"><p class="eyebrow">对当天负荷的影响</p><b>${eff.label}</b></div><p>${effect==='rest'?`每小时恢复约 ${sessionRecovery(s)}%，会抵消当天的一部分负荷。`:'只作为小任务记录，不占用当天负荷额度，也不影响周负荷统计。'}</p><p class="task-note">类型与负荷由 AI 结合名称和备注判断，也可以手动改类型后保存。</p><p class="load-src">主要依据：${e(li?li.top:'—')}</p></div>`;
     const body=custom
-      ?`<div class="dialog-body"><p class="detail-meta"><span class="tag neutral">${e(kindLabel(s))}</span><span class="tag">自动识别 · ${e(li?li.categoryLabel:'生活事务')}</span><span class="tag" style="color:${eff.color};border-color:${eff.color}">${eff.short}</span><span class="tag neutral">${s.start}–${s.end}</span><span class="tag neutral">${duration(s)} 分钟</span></p><div class="load-card" style="--load-color:${isLoad?(li?li.color:'#807499'):eff.color}"><div class="load-card-head"><p class="eyebrow" style="margin:0">${isLoad?'负荷评估 / 五档':'对当天负荷的影响'}</p><b>${isLoad?(li?li.label:'—'):eff.label}</b></div>${isLoad&&li?loadGauge(li):`<p class="load-note" style="margin-top:10px">${effect==='rest'?`每小时恢复约 ${sessionRecovery(s)}%，会抵消当天的一部分负荷。`:'作为小任务记录，不增加也不减少当天负荷。'}</p>`}<p class="load-note">${isLoad?e(li?li.note:''):''} 类型与负荷由 AI 结合名称和备注判断，也可以手动改类型后保存。</p><p class="load-src">主要依据：${e(li?li.top:'—')}</p></div>${s.note?`<p class="dialog-lead">${e(s.note)}</p>`:''}<p class="note">这是自己添加的固定安排。</p></div>`
+      ?`<div class="dialog-body"><p class="detail-meta"><span class="tag neutral">${e(kindLabel(s))}</span><span class="tag">自动识别 · ${e(li?li.categoryLabel:'生活事务')}</span>${effectTag}<span class="tag neutral">${s.start}–${s.end}</span><span class="tag neutral">${duration(s)} 分钟</span></p>${effectPanel}${s.note?`<p class="dialog-lead">${e(s.note)}</p>`:''}<p class="note">这是自己添加的固定安排。</p></div>`
       :`<div class="dialog-body"><p class="detail-meta"><span class="tag">${e(a?a.categoryLabel:'兴趣')}</span><span class="tag neutral">${s.start}–${s.end}</span><span class="tag neutral">${duration(s)} 分钟</span></p>${detail?planDetailMarkup(detail):`<p class="dialog-lead">${e(a?a.goal:'')}</p><p class="note">这份安排来自自动排程。想要每天的具体细则，可以在兴趣详情里生成 AI 方案后再采纳。</p>`}</div>`;
     openDialog(sessionTitle(s),body,button('close-dialog','关闭')+(custom?button('edit-entry','编辑安排',{id:s.id}):button('move-session','调整时间',{id:s.id})));
   }
@@ -3717,9 +3750,11 @@ dialog{background:#151517;border:0;border-radius:24px;box-shadow:0 40px 120px #0
     const recovery=effect==='rest'?(ai&&Number(ai.recovery)>0?Number(ai.recovery):(local.recovery||55)):0;
     const grade=effect==='load'?gradeOfScore(scoreValue):{...effectInfo,tier:effect==='rest'?5:3};
     const chip=ai?'<span class="ai-chip">AI</span>':(entryAIState==='thinking'?'<span class="ai-chip">AI 判断中</span>':'');
-    const right=effect==='load'?`${grade.label} · ${Math.round(scoreValue)} 分/小时`:(effect==='rest'?`${effectInfo.label} · 恢复 ${recovery}%`:`${effectInfo.label} · 小任务`);
+    const stateClass=effect==='load'?'is-load':(effect==='rest'?'is-rest':'is-neutral');
+    const effectPill=effect==='load'?'增加负荷':(effect==='rest'?'减少负荷':'不增不减');
+    const right=effect==='load'?`${grade.label} · ${Math.round(scoreValue)} 分/小时`:(effect==='rest'?`减少负荷 · 恢复 ${recovery}%`:'不计入当天负荷');
     const steps=effect==='load'?`<div class="load-steps" role="img" aria-label="负荷五档中的第 ${grade.tier} 档">${[1,2,3,4,5].map(n=>`<i class="${n<=grade.tier?'on':''}"></i>`).join('')}</div>`:'';
-    box.innerHTML=`<div class="load-preview-inner" style="--load-color:${grade.color}"><span>${chip}识别：<b>${e(kindText)}</b> · ${e(domain)}</span><b style="color:${grade.color}">${right}</b>${steps}</div>`;
+    box.innerHTML=`<div class="load-preview-inner ${stateClass}" style="--load-color:${grade.color}"><span class="effect-pill">${effectPill}</span><span>${chip}识别：<b>${e(kindText)}</b> · ${e(domain)}</span><b style="color:${grade.color}">${right}</b>${steps}</div>`;
   }
   function askDeleteEntry(id){
     const s=state.sessions.find(x=>x.id===id);if(!s)return;
