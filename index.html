@@ -542,17 +542,15 @@ h3{font-weight:650}
 .week-block.neutral-task h3{color:#a8a4b2;font-weight:500;letter-spacing:0}
 .week-block.neutral-task .block-time{color:#918d9b}
 .week-block.neutral-task:hover{background:#1a1a1e;border-color:#4a4753}
-/* 列表行：三类任务用整行样式 + 小标签区分 */
-.task-row.effect-neutral{border:1px dashed #3d3b46;background:#131316}
+/* 列表行：整个模块按负荷类型着色 */
+.task-row.effect-load{border:1px solid rgb(220 201 255 / 22%);border-left:3px solid var(--accent);background:rgb(220 201 255 / 10%)}
+.task-row.effect-load:hover{background:rgb(220 201 255 / 16%)}
+.task-row.effect-neutral{border:1px dashed #3d3b46;border-left:3px dashed #6b6875;background:#131316}
 .task-row.effect-neutral:hover{background:#17171a}
 .task-row.effect-neutral .task-copy h3{color:#a8a4b2;font-weight:500}
-.task-row.effect-rest{border-left:3px solid #3FB950;background:#131d17}
-.task-row.effect-rest:hover{background:#16231b}
+.task-row.effect-rest{border:1px solid rgb(63 185 80 / 28%);border-left:3px solid #3FB950;background:rgb(63 185 80 / 12%)}
+.task-row.effect-rest:hover{background:rgb(63 185 80 / 18%)}
 .task-row.effect-rest .task-copy h3{color:#bdf5ce}
-.row-kind{display:inline-block;margin-left:9px;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600;letter-spacing:0;vertical-align:2px;white-space:nowrap}
-.row-kind.load{background:rgb(220 201 255 / 16%);color:#d9c9ff}
-.row-kind.neutral{border:1px dashed #4a4853;color:#c2bfca}
-.row-kind.rest{background:rgb(63 185 80 / 18%);color:#9fe3ad}
 
 /* 弹窗与提示 */
 dialog{background:#151517;border:0;border-radius:24px;box-shadow:0 40px 120px #000c}
@@ -2899,9 +2897,8 @@ dialog{background:#151517;border:0;border-radius:24px;box-shadow:0 40px 120px #0
   }
   function taskRow(s){
     const a=interest(s.interestId);if(!isCustom(s)&&!a)return '';
-    const effect=sessionEffect(s),neutral=effect==='neutral',rest=effect==='rest';
-    const kindTag=neutral?'<span class="row-kind neutral">小任务 · 不增不减</span>':rest?'<span class="row-kind rest">减少负荷</span>':'<span class="row-kind load">增加负荷</span>';
-    return `<div class="task-row effect-${effect} ${s.done?'done':''}"><label class="check-wrap"><input class="check" type="checkbox" data-complete="${e(s.id)}" ${s.done?'checked':''} aria-label="${e(s.done?'取消完成':'标记完成')} ${e(sessionTitle(s))}"></label><div class="task-time">${s.start}</div><div class="task-copy" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情"><h3>${e(sessionTitle(s))}${kindTag}</h3></div><div class="task-end"><button class="icon-btn" data-action="${isCustom(s)?'edit-entry':'move-session'}" data-id="${e(s.id)}" aria-label="调整 ${e(sessionTitle(s))} 的时间">${icon('edit')}</button></div></div>`;
+    const effect=sessionEffect(s);
+    return `<div class="task-row effect-${effect} ${s.done?'done':''}"><label class="check-wrap"><input class="check" type="checkbox" data-complete="${e(s.id)}" ${s.done?'checked':''} aria-label="${e(s.done?'取消完成':'标记完成')} ${e(sessionTitle(s))}"></label><div class="task-time">${s.start}</div><div class="task-copy" data-action="session-detail" data-id="${e(s.id)}" title="点击查看详情"><h3>${e(sessionTitle(s))}</h3></div><div class="task-end"><button class="icon-btn" data-action="${isCustom(s)?'edit-entry':'move-session'}" data-id="${e(s.id)}" aria-label="调整 ${e(sessionTitle(s))} 的时间">${icon('edit')}</button></div></div>`;
   }
   function renderInterests(){
     main.innerHTML=pageHead('让兴趣有个去处','先收好想做的事，再决定什么时候开始。',button('add-interest','记录新兴趣',{primary:true,icon:'plus'}))+`
